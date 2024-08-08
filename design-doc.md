@@ -254,7 +254,7 @@ Formats:
 When data is added, its BBox is computed from the data or header.
 Although, ideally, we would not depend on GDAL, because it's a very heavy dependency.
 
-### Layout
+### Repository layout
 
 The geodepot repository is stored in a `.geodepot` directory, at the root directory of a project.
 
@@ -289,6 +289,7 @@ Rust is a love, but the GIS library ports are only supported on Ubuntu (mostly).
 ## Notes
 
 How to compute the BBox of a case, if the the data files have different CRS?
+In case there are multiple CRS-es are detected in the case, geodepot could ask which file to use for the BBox calculation.
 
 If cannot compute BBox, maybe possible to manually provide a single point of reference.
 Spatial reference and projection information is optional.
