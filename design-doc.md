@@ -29,10 +29,6 @@ Some of the requirements for the input data:
 
 ## High-level design
 
-Related test data is organised into repositories.
-Normally, there is one repository per project, storing all the data that are required by the tests of the project.
-For example, the 3dbag-pipeline and geoflow-roofer would each have their own repository.
-
 Geodepot is meant for organising data into test cases, aid with the management operations and provide integration to some of the test frameworks for ease of use.
 
 Geodepot is not a data version control system, so do not use it as such, because you might loose your data.
@@ -44,17 +40,108 @@ Conflicts between the local and remote repository are resolved according to the 
 The [pull](#pull) command overwrites the local with the contents of the remote repository.
 The [push](#push) command overwrites the remote with the content of the local repository.
 
+At the bare minimum, geodepot provides:
+
+- An overview of the available cases.
+- An identifier and description of each case.
+- A way to easily get the path to the data file of a case, so that in a test, we can do `geodepot.get(case-id, filename-with-ext)` to obtain the path to the uncompressed data file.
+
+### Concepts
+
+#### Repository
+
+A *repository* is a collection of related *cases* that are used as data in software testing.
+Normally, there is one repository per project, storing all the data that are required by the tests of the project.
+For example, the *3dbag-pipeline* and *geoflow-roofer* would each have their own repository.
+
+#### Index
+
+The *repository* organises the *cases* with its *index*.
+The *index* stores the overview of all *cases* in the repository.
+
+#### Case
+
+A *case* is identified by its identifier and name.
+A *case* contains one or more *data files*.
+
+#### Data (file)
+
+A *data file* is the actual file that contains the data that is used in a test.
+Data files are regular GIS files, for example GeoPackage, LAS or CityJSON.
+
+### Examples
+
+Initialising an empty repository, adding a case, adding a remote and uploading the repository to the remote.
+
+```shell
+cd my-project
+geodepot init
+geodepot add case-name /path/to/dir/with/data description
+geodepot remote add remote-name https://remote.url
+geodepot push remote-name
+```
+
+Cloning an existing repository from a remote and list the available cases.
+Cloning the repository only downloads the index, but not the data files.
+
+```shell
+cd my-project
+geodepot clone https://remote.url
+geodepot list
+```
+
+Returns:
+
+```shell
+ID  NAME    DESCRIPTION
+--  ----    -----------
+1   case-1  A single building in the Netherlands.
+```
+
+Show the details of a case to see its data files.
+
+```shell
+geodepot show case-1
+```
+
+Returns:
+
+```shell
+CASE ID: 1
+
+FILE                CRS
+----                ---
+footprint.gpkg      EPSG:28992
+pointcloud.laz      EPSG:7415
+
+```
+
+Get the path to the specified file of the specified case.
+
+```shell
+geodepot get case-1 footprint.gpkg
+```
+
+Returns:
+
+```shell
+/path/to/.geodepot/cases/1/footprint.gpkg
+```
+
 ### Interfaces
 
-- CLI
-- CMake module that exposes a single function, similar to FetchContent, to download and update the test data
-- API (python)
+- CLI: supports all operations, this is the main interface
+- CMake module that exposes a single function, similar to FetchContent, to download and update the test data. Alternatively, a CMake function like `GeodepotGet(case-id, filename-with-ext)`, which would return the path to the unzipped data file of the case. If the repository is not present on the local system, it clones the repo on the first call of the function.
+- API (python, c++?, rust?): Basically, the only function that is needed is `geodepot.get(case-id, filename-with-ext)`, which gives the full path to a specific file in a specific case.
 - QGIS plugin
 
 ### Operations
 
 - [init](#init)
 - [clone](#clone)
+- [list](#list)
+- [show](#show)
+- [get](#get)
 - [add](#add)
 - [remove](#remove)
 - [pull](#pull)
@@ -76,6 +163,18 @@ Initialise an empty local repository.
 Clone a remote repository and make it available locally.
 Only downloads the INDEX, does not download the data files.
 The data needs to be `pull`-ed explicitly after the repository has been cloned.
+
+#### list
+
+List the cases in the repository.
+
+#### show <case-id>
+
+Show the details of the specified case.
+
+#### get <case-id> <filename>
+
+Return the full path to the specified data file of the specified case.
 
 #### add
 
@@ -135,6 +234,7 @@ For each case, the INDEX stores:
 - bounding box
 - projection information
 - link (? might not be necessary)
+- storage format
 - license
 
 The BBox is in EPSG:3857, so that in can be visualised easily in any web viewer.
@@ -154,9 +254,53 @@ Formats:
 When data is added, its BBox is computed from the data or header.
 Although, ideally, we would not depend on GDAL, because it's a very heavy dependency.
 
+### Layout
+
+The geodepot repository is stored in a `.geodepot` directory, at the root directory of a project.
+
+```
+.geodepot/
+├── cases
+├── index
+├── refs
+└── snapshots
+```
+
+When using the CLI, geodepot looks for the `.geodepot` directory in the current directory.
+When using the API, geodepot can be configured with a path to `.geodepot`, e.g. `geodepot.configure(<path-to-geodepot-dir>)`.
+
+### Dependencies
+
+Basically, the data files only need to be parsed when their BBox is computed, when they are added to the repository.
+That means, that in a testing scenario when the cases are only retrieved, e.g. CI, the heavy GIS dependencies like GDAL, PDAL are not required.
+Need to have an self-contained executable for all the three OS-es, although, it could rely on a system GDAL installation.
+
+### Language of choice
+
+Python is very convenient for development, but the whole Python interpreter + venv is required for running geodepot.
+Unless, I compile it into an exe with pyinstaller.
+But how are then the dependencies like GDAL resolved?
+Additionally, Python is not the best language to write bindings to other languages, like C++ and Rust.
+
+C++ is a pain, but offers the best possibilities, especially, because of the native GIS libraries.
+
+Rust is a love, but the GIS library ports are only supported on Ubuntu (mostly).
+
 ## Notes
 
-Need to have an self-contained executable for all the three OS-es, although, it could rely on a gdal installation.
+How to compute the BBox of a case, if the the data files have different CRS?
+
+If cannot compute BBox, maybe possible to manually provide a single point of reference.
+Spatial reference and projection information is optional.
+
+Probably OO would be neat, like having a `Case` and `CaseCollection` (serialised to the INDEX) with their methods.
+
+https://github.com/ArthurSonzogni/FTXUI
+https://textual.textualize.io/
+
+A case can contain any number of files. If `geodepot.get_case(case-id)` returns the path to the case, then the required file name still needs to be appended to the case-path.
+How do I know what data files are in a case?
+With `geodepot show <case-id>`.
 
 Hash of the archive is required, for checking if new version needs to be downloaded.
 Mimic cmake's fetchcontent.
