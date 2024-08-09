@@ -1,3 +1,10 @@
 # IDE
 .idea
 .run
+
+# Build dirs
+/experiments/pyinstaller/geodepot.spec
+/experiments/pyinstaller/build/
+/experiments/pyinstaller/dist/
+/experiments/pyinstaller/cli.build/
+/experiments/pyinstaller/cli.dist/
