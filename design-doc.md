@@ -88,7 +88,7 @@ Cloning the repository only downloads the index, but not the data files.
 
 ```shell
 cd my-project
-geodepot clone https://remote.url
+geodepot init https://remote.url
 geodepot list
 ```
 
@@ -133,13 +133,27 @@ Returns:
 ### Interfaces
 
 #### CLI 
-supports all operations, this is the main interface
-
-#### CMake 
-CMake module that exposes a single function, similar to FetchContent, to download and update the test data. Alternatively, a CMake function like `GeodepotGet(case-id, filename-with-ext)`, which would return the path to the unzipped data file of the case. If the repository is not present on the local system, it clones the repo on the first call of the function.
+Supports all operations, this is the main interface.
 
 #### API 
-Basically, the only function that is needed is `geodepot.get(case-id, filename-with-ext)`, which gives the full path to a specific file in a specific case.
+The API is meant for passing data paths to tests, nothing else.
+The rest of the operations are done through the CLI.
+Therefore, there are only two functions that are needed: 
+- Maybe `geodepot.configure(<path-to-geodepot-dir>)`, see [Repository layout](#repository-layout), but need to see what is best in combination with `init`.
+- `geodepot.init(remote-url)`, which downloads the remote repository, except the data files and makes it possible to get cases.
+- `geodepot.get(case-id, filename-with-ext)`, which returns the full path to a specific file in a specific case on the local system.
+
+The API is available in:
+- C++ (implementation)
+- Python (binding)
+- Rust (binding)
+
+#### CMake 
+Offers the same functionality as the API, but with CMake functions:
+- `GeodepotInit(remote-url)`
+- `GeodepotGet(case-id, filename-with-ext)`
+
+https://cmake.org/cmake/help/latest/guide/tutorial/Adding%20a%20Custom%20Command%20and%20Generated%20File.html
 
 #### QGIS plugin
 Support adding, viewing, modifying cases.
@@ -148,8 +162,7 @@ Support adding, viewing, modifying cases.
 
 the commands that have the same name as in git, but do sth different are confusing
 
-- [init](#init) merge init with clone so that `init <remote-url>` downloads the repo and index
-- [clone](#clone)
+- [init](#init)
 - [list](#list)
 - [show](#show)
 - [get](#get)
@@ -167,13 +180,10 @@ the commands that have the same name as in git, but do sth different are confusi
 
 #### init
 
-Initialise an empty local repository.
+Without arguments, initialise an empty local repository in the current directory.
 
-#### clone
-
-Clone a remote repository and make it available locally.
-Only downloads the INDEX, does not download the data files.
-The data needs to be `pull`-ed explicitly after the repository has been cloned.
+With a URL to a remote repository as an argument, `geodepot init <url>`, download the remote repository except its data files, to make it available locally.
+The data needs to be `pull`-ed explicitly after the repository has been initialised.
 
 #### list
 
