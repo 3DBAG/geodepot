@@ -8,3 +8,9 @@
 /experiments/pyinstaller/dist/
 /experiments/pyinstaller/cli.build/
 /experiments/pyinstaller/cli.dist/
+
+
+/experiments/vcpkg/build/
+/experiments/vcpkg/vcpkg/
+/experiments/vcpkg/.idea
+/experiments/vcpkg/.run

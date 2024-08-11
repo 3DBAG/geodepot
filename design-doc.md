@@ -39,6 +39,8 @@ That is, because the history of the repository is not retained, only the latest 
 Conflicts between the local and remote repository are resolved according to the selected operation.
 The [pull](#pull) command overwrites the local with the contents of the remote repository.
 The [push](#push) command overwrites the remote with the content of the local repository.
+- use a lock to lock the repository
+- check hashes to see what was the previous state, store hashes in the index file
 
 At the bare minimum, geodepot provides:
 
@@ -130,14 +132,23 @@ Returns:
 
 ### Interfaces
 
-- CLI: supports all operations, this is the main interface
-- CMake module that exposes a single function, similar to FetchContent, to download and update the test data. Alternatively, a CMake function like `GeodepotGet(case-id, filename-with-ext)`, which would return the path to the unzipped data file of the case. If the repository is not present on the local system, it clones the repo on the first call of the function.
-- API (python, c++?, rust?): Basically, the only function that is needed is `geodepot.get(case-id, filename-with-ext)`, which gives the full path to a specific file in a specific case.
-- QGIS plugin
+#### CLI 
+supports all operations, this is the main interface
+
+#### CMake 
+CMake module that exposes a single function, similar to FetchContent, to download and update the test data. Alternatively, a CMake function like `GeodepotGet(case-id, filename-with-ext)`, which would return the path to the unzipped data file of the case. If the repository is not present on the local system, it clones the repo on the first call of the function.
+
+#### API 
+Basically, the only function that is needed is `geodepot.get(case-id, filename-with-ext)`, which gives the full path to a specific file in a specific case.
+
+#### QGIS plugin
+Support adding, viewing, modifying cases.
 
 ### Operations
 
-- [init](#init)
+the commands that have the same name as in git, but do sth different are confusing
+
+- [init](#init) merge init with clone so that `init <remote-url>` downloads the repo and index
 - [clone](#clone)
 - [list](#list)
 - [show](#show)
@@ -277,14 +288,25 @@ Need to have an self-contained executable for all the three OS-es, although, it 
 
 ### Language of choice
 
-Python is very convenient for development, but the whole Python interpreter + venv is required for running geodepot.
-Unless, I compile it into an exe with pyinstaller.
-But how are then the dependencies like GDAL resolved?
-Additionally, Python is not the best language to write bindings to other languages, like C++ and Rust.
-
 C++ is a pain, but offers the best possibilities, especially, because of the native GIS libraries.
 
 Rust is a love, but the GIS library ports are only supported on Ubuntu (mostly).
+
+Python is very convenient for development, but the whole Python interpreter + venv is required for running geodepot.
+Additionally, Python is not the best language to write bindings to other languages, like C++ and Rust.
+Unless, I compile it into an exe with pyinstaller.
+With pyinstaller, geodepot is compiled into a statically linked exe, so it can be used without Python and GIS dependencies.
+We can write it all in Python, and distribute the exe.
+Then write the API in C++/Rust, which is easy, because they only need two functions, `configure` and `get`. 
+Both are simple operations.
+In this case, the API would have a complete independent codebase from the geodepot app, thus it wouldn't require any of the heavy dependencies, which is nice.
+Maintaining the two functions in the API is easy enough.
+
+### Packaging and distribution
+
+The executable and directory bundle is generated with Pyinstaller's `--onedir` option.
+The exe must stay in the directory, thus when the user downloads the latest release, they need to place the whole dir to the location and link to the exe somehow.
+I could create and install script for each release, which would download the latest release, move to the correct location, evtl. replace the old version and take care to adding the exe to the path.
 
 ## Notes
 

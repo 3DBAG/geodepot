@@ -1,0 +1,28 @@
+{
+  "name": "geodepot",
+  "version-string": "1.0.0",
+  "dependencies": [
+    {
+      "name": "nlohmann-json",
+      "version>=": "3.11.3"
+    },
+    "pdal",
+    "proj",
+    "geos",
+    "fmt",
+    "spdlog",
+    {
+      "name": "gdal",
+      "features": [
+        "recommended-features"
+      ]
+    }
+  ],
+  "overrides": [
+    {
+      "name": "nlohmann-json",
+      "version": "3.11.3"
+    }
+  ],
+  "builtin-baseline": "9224b3bbd8df24999d85720b1d005dd6f969ade0"
+}
