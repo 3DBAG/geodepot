@@ -139,7 +139,7 @@ Supports all operations, this is the main interface.
 The API is meant for passing data paths to tests, nothing else.
 The rest of the operations are done through the CLI.
 Therefore, there are only two functions that are needed: 
-- Maybe `geodepot.configure(<path-to-geodepot-dir>)`, see [Repository layout](#repository-layout), but need to see what is best in combination with `init`.
+- Maybe `geodepot.configure(<path-to-geodepot-dir>)`, see [Repository layout](#repository-layout), but need to see what is best in combination with `init`. Although, the `geodepot` constructor could be used to configure the repository path too, instead of an explicit `configure` method.
 - `geodepot.init(remote-url)`, which downloads the remote repository, except the data files and makes it possible to get cases.
 - `geodepot.get(case-id, filename-with-ext)`, which returns the full path to a specific file in a specific case on the local system.
 
@@ -153,7 +153,9 @@ Offers the same functionality as the API, but with CMake functions:
 - `GeodepotInit(remote-url)`
 - `GeodepotGet(case-id, filename-with-ext)`
 
-https://cmake.org/cmake/help/latest/guide/tutorial/Adding%20a%20Custom%20Command%20and%20Generated%20File.html
+If the geodepot index needs to be parsed, the CMake commands alone won't suffice to write the functions.
+In that case, I would need to compile the C++ API into an exe, and run that exe for the functions.
+See [CMake custom commands](https://cmake.org/cmake/help/latest/guide/tutorial/Adding%20a%20Custom%20Command%20and%20Generated%20File.html).
 
 #### QGIS plugin
 Support adding, viewing, modifying cases.
@@ -247,19 +249,48 @@ Delete a snapshot.
 
 ### The INDEX
 
-The INDEX contains the overview of all cases in the repository.
-For each case, the INDEX stores:
+The INDEX contains the overview of all *cases* and *data files* in the repository.
+For each *data file*, the INDEX stores:
 
-- identifier
-- description
-- bounding box
-- projection information
-- link (? might not be necessary)
-- storage format
-- license
+| Field            | Type    | Description                                                                          |
+|:-----------------|:--------|:-------------------------------------------------------------------------------------|
+| id               | uint    | Auto-generated, sequential data identifier.                                          |
+| case_id          | string  | User provided case identifier.                                                       |
+| case_description | string  | User provided case description. Long text, can be multiline. Maybe contain markdown? |
+| file_name        | string  | Data file name, including extensions.                                                |
+| file_sha1        | string  | SHA-1 hash of the data file.                                                         |
+| file_format      | string  | Data format.                                                                         |
+| file_license     | string  | User provided license abbreviation or link to a license.                             |
+| bbox             | Polygon | The bounding polygon of the data file extent.                                        |
 
-The BBox is in EPSG:3857, so that in can be visualised easily in any web viewer.
+
 Maybe Flatgeobuff to be queriable without a server.
+However, Flatgeobuff requires extra libraries for parsing.
+A standard-compliant GeoJSON seems like a better option, because it is easily parsable in any language and it can be visualised by almost every GIS application.
+Since I expect that may only contain a few tens of data files, maybe a hundred in extreme cases, there is no need for a high performance format.
+
+#### BBox
+
+The BBox is in a global CRS, e.g. EPSG:3857, so that in can be visualised easily in any web viewer.
+The data files can be in different CRS-es, even within one case, therefore, their BBox is reprojected into the common CRS and added to the INDEX.
+
+The BBox is optional.
+It is possible that the BBox cannot be computed, or the data doesn't have coordinates.
+It maybe possible to manually provide a single point of reference.
+
+**Dutch baselayer global CRS availability**
+
+| Dataset        | EPSG:3857 | EPSG:4326 | CRS:84 |
+|:---------------|:---------:|:---------:|:------:|
+| TOP10NL        |     x     |           |        |
+| BAG            |     x     |     x     |   x    |
+| BGT            |     x     |           |        |
+| Luchtfoto      |     x     |     x     |        |
+| OpenBasisKaart |     x     |           |        |
+| BRO            |     x     |     x     |   x    |
+| CBS datasets   |     x     |     x     |   x    |
+| NWB            |     x     |     x     |   x    |
+
 
 ### Data files
 
@@ -267,13 +298,13 @@ Data is in *.zip*.
 There is no custom format, just plain GIS formats zipped. 
 2D vector formats are thus GDAL-readable from within the *.zip*.
 
-Formats:
-- gpkg
-- laz
-- cityjson
-
 When data is added, its BBox is computed from the data or header.
-Although, ideally, we would not depend on GDAL, because it's a very heavy dependency.
+
+#### Data format detection
+
+Try GDAL, PDAL, see what gives.
+Some of them are custom implemented, for instance, the extensions `.city.json` refers to the `CityJSON` format, the extension `.city.jsonl` refers to the `CityJSONSequence` format.
+3DTiles is similar, because the `tileset.json` or the `.gltf/.b3dm` files refer to the `Cesium 3DTiles` format.
 
 ### Repository layout
 
@@ -319,12 +350,6 @@ The exe must stay in the directory, thus when the user downloads the latest rele
 I could create and install script for each release, which would download the latest release, move to the correct location, evtl. replace the old version and take care to adding the exe to the path.
 
 ## Notes
-
-How to compute the BBox of a case, if the the data files have different CRS?
-In case there are multiple CRS-es are detected in the case, geodepot could ask which file to use for the BBox calculation.
-
-If cannot compute BBox, maybe possible to manually provide a single point of reference.
-Spatial reference and projection information is optional.
 
 Probably OO would be neat, like having a `Case` and `CaseCollection` (serialised to the INDEX) with their methods.
 
