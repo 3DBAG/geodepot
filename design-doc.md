@@ -273,11 +273,14 @@ For each *data file*, the INDEX stores:
 | file_license     | string  | User provided license abbreviation or link to a license.                                          |
 | bbox             | Polygon | The bounding polygon of the data file extent.                                                     |
 
-
 Maybe Flatgeobuff to be queriable without a server.
 However, Flatgeobuff requires extra libraries for parsing.
 A standard-compliant GeoJSON seems like a better option, because it is easily parsable in any language and it can be visualised by almost every GIS application.
 Since I expect that may only contain a few tens of data files, maybe a hundred in extreme cases, there is no need for a high performance format.
+
+More importantly, QGIS cannot use SFTP to retrieve a file, only HTTP/HTTPS/FTP.
+Unless the remote repository is published through a webserver, we cannot load the remote INDEX directly to QGIS.
+The repository needs to be cloned first.
 
 #### BBox
 
@@ -428,6 +431,8 @@ The installer script,
 - create the global geodepot User on the machine if needed.
 
 ## Notes
+
+ssh://gilfoyle/data/work/bdukai/geodepot/.geodepot/index.geojson
 
 Probably OO would be neat, like having a `Case` and `CaseCollection` (serialised to the INDEX) with their methods.
 
