@@ -3,6 +3,8 @@
 .run
 
 # Build dirs
+/src/geodepot.egg-info/
+
 /experiments/pyinstaller/geodepot.spec
 /experiments/pyinstaller/build/
 /experiments/pyinstaller/dist/

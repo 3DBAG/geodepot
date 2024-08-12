@@ -1,0 +1,9 @@
+gdal
+pdal
+pyproj
+click
+# Dev
+pytest
+pyinstaller
+black
+isort
