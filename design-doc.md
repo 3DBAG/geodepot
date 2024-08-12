@@ -36,12 +36,6 @@ It is assumed that the data that you store in a geodepot repository is already a
 Thus, if the repository is accidentally overwritten with unwanted changes, the desired state can be recreated with moderate effort.
 That is, because the history of the repository is not retained, only the latest version is available.
 
-Conflicts between the local and remote repository are resolved according to the selected operation.
-The [pull](#pull) command overwrites the local with the contents of the remote repository.
-The [push](#push) command overwrites the remote with the content of the local repository.
-- use a lock to lock the repository
-- check hashes to see what was the previous state, store hashes in the index file
-
 At the bare minimum, geodepot provides:
 
 - An overview of the available cases.
@@ -49,6 +43,11 @@ At the bare minimum, geodepot provides:
 - A way to easily get the path to the data file of a case, so that in a test, we can do `geodepot.get(case-id, filename-with-ext)` to obtain the path to the uncompressed data file.
 
 ### Concepts
+
+#### User
+
+The user information consists of a name and an e-mail address and it is registered in the local HOME directory of the User.
+The user information is used for identifying changes and locks.
 
 #### Repository
 
@@ -172,6 +171,7 @@ the commands that have the same name as in git, but do sth different are confusi
 - [remove](#remove)
 - [pull](#pull)
 - [push](#push)
+- [verify](#verify)
 - [remote](#remote-list)
 - [remote add](#remote-add)
 - [remote remove](#remote-remove)
@@ -216,6 +216,14 @@ With the case ID as argument, `geodepot pull <case-id>`, it only checks and down
 #### push
 
 Uploads any local changes to the remote repository, overwriting the remote version.
+If the remote contains a changed version that is not the previous state of the local, the `push` operation exits without making any changes on the remote.
+In this case the `-f, --force` option can forcibly overwrite the remote, even if there are unknown changes.
+
+#### verify
+
+Verify the integrity of the repository, by comparing the stored hashes in the INDEX to the recomputed hash of the corresponding files.
+Without arguments, it verifies the local repository.
+With the remote name as argument, it verifies the remote repository.
 
 #### remote
 
@@ -252,16 +260,18 @@ Delete a snapshot.
 The INDEX contains the overview of all *cases* and *data files* in the repository.
 For each *data file*, the INDEX stores:
 
-| Field            | Type    | Description                                                                          |
-|:-----------------|:--------|:-------------------------------------------------------------------------------------|
-| id               | uint    | Auto-generated, sequential data identifier.                                          |
-| case_id          | string  | User provided case identifier.                                                       |
-| case_description | string  | User provided case description. Long text, can be multiline. Maybe contain markdown? |
-| file_name        | string  | Data file name, including extensions.                                                |
-| file_sha1        | string  | SHA-1 hash of the data file.                                                         |
-| file_format      | string  | Data format.                                                                         |
-| file_license     | string  | User provided license abbreviation or link to a license.                             |
-| bbox             | Polygon | The bounding polygon of the data file extent.                                        |
+| Field            | Type    | Description                                                                                       |
+|:-----------------|:--------|:--------------------------------------------------------------------------------------------------|
+| id               | uint    | Auto-generated, sequential data identifier.                                                       |
+| case_id          | string  | User provided case identifier. Must be unique, contain only alphanumeric characters and/or `-,_`. |
+| case_description | string  | User provided case description. Long text, can be multiline. Maybe contain markdown?              |
+| case_sha1        | string  | SHA-1 hash of the zip-compressed case.                                                            |
+| case_changed_by  | string  | The user that made the last change to the case.                                                   |
+| file_name        | string  | Data file name, including extensions.                                                             |
+| file_sha1        | string  | SHA-1 hash of the data file.                                                                      |
+| file_format      | string  | Data format.                                                                                      |
+| file_license     | string  | User provided license abbreviation or link to a license.                                          |
+| bbox             | Polygon | The bounding polygon of the data file extent.                                                     |
 
 
 Maybe Flatgeobuff to be queriable without a server.
@@ -291,6 +301,58 @@ It maybe possible to manually provide a single point of reference.
 | CBS datasets   |     x     |     x     |   x    |
 | NWB            |     x     |     x     |   x    |
 
+### Conflict resolution
+
+Conflicts between the local and remote repository are resolved according to the selected operation.
+The [pull](#pull) command overwrites the local with the contents of the remote repository.
+The [push](#push) command overwrites the remote with the content of the local repository.
+
+#### push 
+
+The scenarios below describe the change of a specific case.
+Pushing the repository follows the same steps, just it does so for each case in sequence.
+
+**A. Remote has not changed**
+
+User makes local changes and wants to update the remote.
+The local INDEX contains the hash of the last update (push/pull).
+User issues `push <case-id>`, then:
+1. Check if the remote is locked. If not, then continue.
+2. Place a LOCK on the remote, with information on who owns the lock. This prevents that the remote is updated by someone else, while the User uploads the changes.
+3. Compress the changed case into a temp directory/file.
+4. Compute SHA-1 of zip file.
+5. Compare the case's local data hash in the INDEX with the remote data hash in the INDEX. Maybe compare the whole INDEX? Because not on the data files can change, but also the description, license. 
+6. If there is no difference, that means that the remote hasn't changed since the local changes were made and it is safe to overwrite the remote with the local changes.
+7. Overwrite the case's hash in remote INDEX with the hash of the new zipped case on the local.
+8. Upload the local zip to the remote and overwrite the remote case with it.
+9. Remove the LOCK from the remote.
+
+**B. Remote is being updated**
+
+User makes local changes and wants to update the remote.
+The local INDEX contains the hash of the last update (push/pull).
+User issues `push <case-id>`, then:
+1. Check if the remote is locked. If yes, then stop and display who owns the lock, tell the User to try again later.
+
+**C. Remote has changed**
+
+User makes local changes and wants to update the remote.
+The local INDEX contains the hash of the last update (push/pull).
+User issues `push <case-id>`, then:
+1. Check if the remote is locked. If not, then continue.
+2. Place a LOCK on the remote, with information on who owns the lock. This prevents that the remote is updated by someone else, while the User uploads the changes.
+3. Compress the changed case into a temp directory/file.
+4. Compute SHA-1 of zip file.
+5. Compare the case's local INDEX hash with the remote INDEX hash.
+6. If there is a difference, that means that the remote has changed since the last pull. This situation cannot be resolved automatically, because geodepot cannot merge data files. The `push` stops and displays who made the last change, the path to the new temp-archive and tells to User to contact the last-changer to resolve the conflict.
+7. Remove the LOCK from the remote.
+
+#### pull
+
+Firstly, the repository integrity is verified ([verify](#verify-remote)).
+If there are changed cases that haven't been pushed...
+The `pull` operation also places a LOCK on the remote, to prevent it from change during the download.
+Once the download is complete, the LOCK is removed.
 
 ### Data files
 
@@ -309,14 +371,24 @@ Some of them are custom implemented, for instance, the extensions `.city.json` r
 ### Repository layout
 
 The geodepot repository is stored in a `.geodepot` directory, at the root directory of a project.
+In the example below, `wippolder` is a case ID.
 
 ```
 .geodepot/
 ├── cases
+│   ├── wippolder
+│   │   ├── wippolder.gpkg
+│   │   └── wippolder.las
+│   └── wippolder.zip
 ├── index
 ├── refs
 └── snapshots
 ```
+
+The zip-compressed cases are stored along with the uncompressed version, so that pulling a case or repository is as fast as possible and it does not involve other operations on the remote than transferring the file.
+When the archive is downloaded, it is extracted into the same directory and the archive is retained.
+When a data file is retrieved from a case with `get`, the file path points to the uncompressed case.
+Although, retaining the archives increases the space consumption significantly, I expect that the data files are relatively small so in total the space consumption will remain acceptable and the benefits of having the archives ready for download will outweigh the space costs.
 
 When using the CLI, geodepot looks for the `.geodepot` directory in the current directory.
 When using the API, geodepot can be configured with a path to `.geodepot`, e.g. `geodepot.configure(<path-to-geodepot-dir>)`.
@@ -348,6 +420,12 @@ Maintaining the two functions in the API is easy enough.
 The executable and directory bundle is generated with Pyinstaller's `--onedir` option.
 The exe must stay in the directory, thus when the user downloads the latest release, they need to place the whole dir to the location and link to the exe somehow.
 I could create and install script for each release, which would download the latest release, move to the correct location, evtl. replace the old version and take care to adding the exe to the path.
+
+The installer script,
+- downloads the latest release,
+- moves it to the correct location, replacing the previous version,
+- updates the PATH to include the exe if needed,
+- create the global geodepot User on the machine if needed.
 
 ## Notes
 
