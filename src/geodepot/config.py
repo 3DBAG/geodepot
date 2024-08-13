@@ -8,9 +8,10 @@ from dataclasses import dataclass
 logger = logging.getLogger(__name__)
 
 GEODEPOT_CONFIG_GLOBAL = ".geodepotconfig.json"
+GEODEPOT_CONFIG_LOCAL = "config.json"
 
 
-@dataclass(repr=True, frozen=True)
+@dataclass(repr=True)
 class User:
     name: str
     email: str
@@ -34,9 +35,34 @@ def as_user(dct: dict) -> User | dict:
         return dct
 
 
-@dataclass(repr=True, frozen=True)
+@dataclass(repr=True)
+class Remote:
+    name: str
+    url: str
+
+    def as_json_str(self) -> str:
+        return json.dumps(self, cls=RemoteEncoder)
+
+
+class RemoteEncoder(json.JSONEncoder):
+    def default(self, o):
+        if dataclasses.is_dataclass(o):
+            return dataclasses.asdict(o)
+        else:
+            return super().default(o)
+
+
+def as_remote(dct: dict) -> Remote | dict:
+    if "name" in dct and "url" in dct:
+        return Remote(name=dct["name"], url=dct["url"])
+    else:
+        return dct
+
+
+@dataclass(repr=True)
 class Config:
-    user: User
+    user: User | None = None
+    remotes: list[Remote] | None = None
 
     @classmethod
     def read_from_file(cls, path: Path) -> Self:
@@ -52,12 +78,28 @@ class Config:
     def as_json_str(self) -> str:
         return json.dumps(self, cls=config_encoder)
 
+    def update(self, other: Self):
+        """Updates the values of self with the values from another Config instance."""
+        if other.user is not None:
+            self.user = other.user
+        if other.remotes is not None:
+            self.remotes = other.remotes
+
 
 def as_config(dct: dict) -> Config | dict:
-    if "user" in dct:
-        return Config(user=as_user(dct["user"]))
-    else:
+    user = None
+    remotes = None
+    if (usr := dct.get("user")) is not None:
+        user = as_user(usr)
+    if (rmt := dct.get("remotes")) is not None:
+        remotes = [
+            as_remote({"name": remote_name, **remote})
+            for remote_name, remote in rmt.items()
+        ]
+    if user is None and remotes is None:
         return dct
+    else:
+        return Config(user=user, remotes=remotes)
 
 
 class ConfigEncoder(json.JSONEncoder):
@@ -89,7 +131,7 @@ def multiencoder_factory(*encoders):
     return MultipleJsonEncoders
 
 
-config_encoder = multiencoder_factory(ConfigEncoder, UserEncoder)
+config_encoder = multiencoder_factory(ConfigEncoder, UserEncoder, RemoteEncoder)
 
 
 def get_global_config_path() -> Path | None:
@@ -100,3 +142,20 @@ def get_global_config_path() -> Path | None:
 def get_global_config() -> Config | None:
     if (global_config_path := get_global_config_path()) is not None:
         return Config.read_from_file(global_config_path)
+
+
+def get_local_config_path() -> Path | None:
+    if (local_config_path := Path.cwd() / ".geodepot" / GEODEPOT_CONFIG_LOCAL).exists():
+        return local_config_path
+
+
+def get_local_config() -> Config | None:
+    if (local_config_path := get_local_config_path()) is not None:
+        return Config.read_from_file(local_config_path)
+
+
+def get_config() -> Config:
+    config = get_global_config()
+    local_config = get_local_config()
+    config.update(local_config)
+    return config

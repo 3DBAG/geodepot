@@ -11,9 +11,28 @@ def mock_user_home(monkeypatch, data_dir):
     monkeypatch.setattr(Path, "home", mockreturn)
 
 
-def test_read_config(mock_user_home):
+@pytest.fixture
+def mock_project_dir(monkeypatch, data_dir):
+    def mockreturn():
+        return data_dir / "mock_project"
+
+    monkeypatch.setattr(Path, "cwd", mockreturn)
+
+
+def test_read_global_config(mock_user_home):
     config = get_global_config()
     assert config.user.name == "Kovács János"
+
+
+def test_read_local_config(mock_project_dir):
+    config = get_local_config()
+    assert config.remotes[0].name == "remote-name"
+
+
+def test_read_combined_config(mock_user_home, mock_project_dir):
+    config = get_config()
+    assert config.remotes is not None
+    assert config.user is not None
 
 
 def test_as_json():
