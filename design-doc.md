@@ -265,10 +265,10 @@ Delete a snapshot.
 You can specify Geodepot configuration settings with the `geodepot config` command.
 Geodepot looks for configuration values on two levels, global and local.
 
-Geodepot first looks for the configuration in the `~/.geodepotconfig` file, which is specific to each user.
+Geodepot first looks for the configuration in the `~/.geodepotconfig.json` file, which is specific to each user.
 You can make Geodepot read and write to this file by passing the `--global` option.
 
-Secondly, Geodepot looks for configuration values in the configuration file in the Geodepot directory (`.geodepot/config`) of whatever repository you are currently using.
+Secondly, Geodepot looks for configuration values in the configuration file in the Geodepot directory (`.geodepot/config.json`) of whatever repository you are currently using.
 These values are specific to that single repository and they are read and written by passing the `--local` option.
 This is the default option of the `geodepot config` command.
 
