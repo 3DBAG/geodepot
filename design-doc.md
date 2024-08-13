@@ -163,6 +163,7 @@ Support adding, viewing, modifying cases.
 
 the commands that have the same name as in git, but do sth different are confusing
 
+- [config](#config)
 - [init](#init)
 - [list](#list)
 - [show](#show)
@@ -179,6 +180,10 @@ the commands that have the same name as in git, but do sth different are confusi
 - [snapshot save](#snapshot-save)
 - [snapshot load](#snapshot-load)
 - [snapshot remove](#snapshot-remove)
+
+#### config
+
+Configure Geodepot.
 
 #### init
 
@@ -254,6 +259,22 @@ Overwrite the repository from a saved snapshot.
 Delete a snapshot.
 
 ## Detailed design
+
+### Configuration
+
+You can specify Geodepot configuration settings with the `geodepot config` command.
+Geodepot looks for configuration values on two levels, global and local.
+
+Geodepot first looks for the configuration in the `~/.geodepotconfig` file, which is specific to each user.
+You can make Geodepot read and write to this file by passing the `--global` option.
+
+Secondly, Geodepot looks for configuration values in the configuration file in the Geodepot directory (`.geodepot/config`) of whatever repository you are currently using.
+These values are specific to that single repository and they are read and written by passing the `--local` option.
+This is the default option of the `geodepot config` command.
+
+The local level config overwrites the values of the global level config.
+
+Reference: [Git Configuration](https://git-scm.com/book/en/v2/Customizing-Git-Git-Configuration)
 
 ### The INDEX
 
