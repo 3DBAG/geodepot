@@ -404,8 +404,8 @@ In the example below, `wippolder` is a case ID.
 │   │   ├── wippolder.gpkg
 │   │   └── wippolder.las
 │   └── wippolder.zip
-├── index
-├── refs
+├── index.geojson
+├── config.json
 └── snapshots
 ```
 

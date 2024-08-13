@@ -1,22 +1,15 @@
-import dataclasses
 import json
 from pathlib import Path
 from typing import Self
 import logging
 from dataclasses import dataclass
 
+from geodepot.encode import DataClassEncoder
+
 logger = logging.getLogger(__name__)
 
 GEODEPOT_CONFIG_GLOBAL = ".geodepotconfig.json"
 GEODEPOT_CONFIG_LOCAL = "config.json"
-
-
-class DataClassEncoder(json.JSONEncoder):
-    def default(self, o):
-        if dataclasses.is_dataclass(o):
-            return dataclasses.asdict(o)
-        else:
-            return super().default(0)
 
 
 @dataclass(repr=True)
