@@ -11,21 +11,21 @@ GEODEPOT_CONFIG_GLOBAL = ".geodepotconfig.json"
 GEODEPOT_CONFIG_LOCAL = "config.json"
 
 
+class DataClassEncoder(json.JSONEncoder):
+    def default(self, o):
+        if dataclasses.is_dataclass(o):
+            return dataclasses.asdict(o)
+        else:
+            return super().default(0)
+
+
 @dataclass(repr=True)
 class User:
     name: str
     email: str
 
     def as_json_str(self) -> str:
-        return json.dumps(self, cls=UserEncoder)
-
-
-class UserEncoder(json.JSONEncoder):
-    def default(self, o):
-        if dataclasses.is_dataclass(o):
-            return dataclasses.asdict(o)
-        else:
-            return super().default(o)
+        return json.dumps(self, cls=DataClassEncoder)
 
 
 def as_user(dct: dict) -> User | dict:
@@ -41,15 +41,7 @@ class Remote:
     url: str
 
     def as_json_str(self) -> str:
-        return json.dumps(self, cls=RemoteEncoder)
-
-
-class RemoteEncoder(json.JSONEncoder):
-    def default(self, o):
-        if dataclasses.is_dataclass(o):
-            return dataclasses.asdict(o)
-        else:
-            return super().default(o)
+        return json.dumps(self, cls=DataClassEncoder)
 
 
 def as_remote(dct: dict) -> Remote | dict:
@@ -102,14 +94,6 @@ def as_config(dct: dict) -> Config | dict:
         return Config(user=user, remotes=remotes)
 
 
-class ConfigEncoder(json.JSONEncoder):
-    def default(self, o):
-        if dataclasses.is_dataclass(o):
-            return dataclasses.asdict(o)
-        else:
-            return super().default(0)
-
-
 def multiencoder_factory(*encoders):
     """Required when using multiple JSONEncoders.
     https://stackoverflow.com/a/76931520/3717824
@@ -131,7 +115,8 @@ def multiencoder_factory(*encoders):
     return MultipleJsonEncoders
 
 
-config_encoder = multiencoder_factory(ConfigEncoder, UserEncoder, RemoteEncoder)
+# config_encoder = multiencoder_factory(ConfigEncoder, UserEncoder, ...)
+config_encoder = multiencoder_factory(DataClassEncoder)
 
 
 def get_global_config_path() -> Path | None:
