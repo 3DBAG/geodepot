@@ -22,38 +22,36 @@ class Drivers(Enum):
 class DataFile:
     """A data file in the repository."""
 
-    def __init__(self, file: Path, data_license: str = None):
-        self.path = file.resolve()
+    def __init__(self, path: Path, data_license: str = None):
+        self.name = path.name
         self.license = data_license
-        self.sha1 = self.__compute_sha1()
-        self.driver, self.format = self.__infer_format()
-        self.bbox = self.__compute_bbox()
+        self.sha1 = self.__compute_sha1(path)
+        self.driver, self.format = self.__infer_format(path)
+        self.bbox = self.__compute_bbox(path)
 
-    @property
-    def name(self) -> str:
-        return self.path.name
-
-    def __compute_sha1(self) -> str:
-        with self.path.open("rb") as f:
+    @staticmethod
+    def __compute_sha1(path: Path) -> str:
+        with path.open("rb") as f:
             return hashlib.file_digest(f, "sha1").hexdigest()
 
-    def __infer_format(self) -> tuple[Drivers, str]:
+    @staticmethod
+    def __infer_format(path: Path) -> tuple[Drivers, str]:
         """Try opening the file with different readers to determine its format."""
-        if is_cityjson(self.path.suffixes):
+        if is_cityjson(path.suffixes):
             return Drivers.CITYJSON, "cityjson"
-        elif is_cityjson_seq(self.path.suffixes):
+        elif is_cityjson_seq(path.suffixes):
             return Drivers.CITYJSON, "cityjsonseq"
-        if (ogr_format := try_ogr(self.path)) is not None:
+        if (ogr_format := try_ogr(path)) is not None:
             return Drivers.OGR, ogr_format
-        if (gdal_format := try_gdal(self.path)) is not None:
+        if (gdal_format := try_gdal(path)) is not None:
             return Drivers.GDAL, gdal_format
-        if (pdal_format := try_pdal(self.path)) is not None:
+        if (pdal_format := try_pdal(path)) is not None:
             return Drivers.PDAL, pdal_format
-        raise ValueError(f"Cannot determine format of {self.path}")
+        raise ValueError(f"Cannot determine format of {path}")
 
-    def __compute_bbox(self) -> tuple[float, float, float, float]:
+    def __compute_bbox(self, path: Path) -> tuple[float, float, float, float]:
         if self.driver == Drivers.CITYJSON:
-            with self.path.open() as f:
+            with path.open() as f:
                 cj = json.load(f)
                 if "vertices" in cj:
                     t = cj.get(
@@ -79,19 +77,17 @@ class DataFile:
                     return minx, maxx, miny, maxy
                 else:
                     raise ValueError(
-                        f"Cannot compute bounding box for {self.path}, file does not contain a 'vertices' member"
+                        f"Cannot compute bounding box for {path}, file does not contain a 'vertices' member"
                     )
         elif self.driver == Drivers.GDAL:
             raise NotImplementedError
         elif self.driver == Drivers.OGR:
-            with ogr.Open(self.path) as ogr_dataset:
+            with ogr.Open(path) as ogr_dataset:
                 lyr = ogr_dataset.GetLayer(0)
                 return lyr.GetExtent(force=True)
                 # lyr.GetSpatialRef().ExportToWkt()
         elif self.driver == Drivers.PDAL:
-            pdal_pipeline = pdal.Pipeline(
-                json.dumps([str(self.path), pdal_filter_stats])
-            )
+            pdal_pipeline = pdal.Pipeline(json.dumps([str(path), pdal_filter_stats]))
             pdal_pipeline.execute()
             stats = pdal_pipeline.metadata["metadata"]["filters.stats"]["statistic"]
             x_max = stats[0]["maximum"]

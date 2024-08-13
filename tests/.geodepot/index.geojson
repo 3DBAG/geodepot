@@ -1,9 +1,0 @@
-{
-"type": "FeatureCollection",
-"name": "index",
-"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::3857" } },
-"features": [
-{ "type": "Feature", "properties": { "id": 1, "case_id": "wippolder", "case_description": "wippolder area description", "case_sha1": "bla", "case_changed_by": "bdukai", "file_name": "wippolder.las", "file_format": "LAS", "file_license": "CC-0" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 486117.415697, 6800362.720577 ], [ 486097.344148, 6801326.154907 ], [ 488004.141259, 6801346.226456 ], [ 488054.320131, 6800402.863675 ], [ 486117.415697, 6800362.720577 ] ] ] } },
-{ "type": "Feature", "properties": { "id": 2, "case_id": "wippolder", "case_description": "wippolder area description", "case_sha1": "bla", "case_changed_by": "bdukai", "file_name": "wippolder.gpkg", "file_format": "GPKG", "file_license": "CC-0" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 486418.488925, 6801145.510971 ], [ 486418.488925, 6800473.114094 ], [ 487331.744383, 6800503.221417 ], [ 487331.744383, 6801145.510971 ], [ 486418.488925, 6801145.510971 ] ] ] } }
-]
-}
