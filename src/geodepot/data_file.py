@@ -1,10 +1,16 @@
 import hashlib
 import json
+import logging
+from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
 
 import pdal
 from osgeo import ogr, gdal
+
+from geodepot.config import User
+
+logger = logging.getLogger(__name__)
 
 gdal.UseExceptions()
 ogr.UseExceptions()
@@ -19,15 +25,40 @@ class Drivers(Enum):
     PDAL = auto()
 
 
+@dataclass(repr=True)
 class DataFile:
     """A data file in the repository."""
 
-    def __init__(self, path: Path, data_license: str = None):
+    def __init__(
+        self,
+        path: Path,
+        data_license: str = None,
+        data_format: str = None,
+        description: str = None,
+        changed_by: User = None,
+    ):
         self.name = path.name
         self.license = data_license
-        self.sha1 = self.__compute_sha1(path)
-        self.driver, self.format = self.__infer_format(path)
-        self.bbox = self.__compute_bbox(path)
+        self.format = data_format
+        self.description = description
+        self.changed_by = changed_by
+        self.sha1 = None
+        self.driver = None
+        self.bbox = None
+        if path.is_file():
+            self.sha1 = self.__compute_sha1(path)
+            if data_format is None:
+                self.driver, self.format = self.__infer_format(path)
+                if self.driver is None:
+                    logger.error(
+                        f"Could not determine the driver for the format {self.format} of {path}"
+                    )
+                else:
+                    self.bbox = self.__compute_bbox(path)
+            else:
+                logger.info(
+                    f"Forcing format {data_format} on {path}, won't be able to determine driver and compute the bounding box."
+                )
 
     @staticmethod
     def __compute_sha1(path: Path) -> str:

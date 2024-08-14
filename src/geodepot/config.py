@@ -20,6 +20,9 @@ class User:
     def to_json(self) -> str:
         return json.dumps(self, cls=DataClassEncoder, indent=JSON_INDENT)
 
+    def to_pretty(self) -> str:
+        return f"{self.name} <{self.email}>"
+
 
 def as_user(dct: dict) -> User | dict:
     if "name" in dct and "email" in dct:
@@ -53,7 +56,11 @@ class Config:
     def read_from_file(cls, path: Path) -> Self:
         logger.debug(f"Reading config from file: {path}")
         with path.open() as f:
-            return json.load(f, object_hook=as_config)
+            c = json.load(f, object_hook=as_config)
+            # An empty config is serialized as an empty JSON object '{}', so the
+            # deserializer 'as_config' will return a dict and not an empty Config
+            # instance.
+            return c if not isinstance(c, dict) else cls()
 
     def write_to_file(self, path: Path) -> None:
         logger.debug(f"Writing config to file: {path}")
@@ -71,6 +78,11 @@ class Config:
 
 
 def as_config(dct: dict) -> Config | dict:
+    """Deserialize a dict as a Config instance.
+    If the input dict does not contain the expected members of Config
+    (e.g. it is empty), it will return an empty dict and not an empty Config
+    instance. This behaviour is required for the deserialization of nested objects.
+    """
     user = None
     remotes = None
     if (usr := dct.get("user")) is not None:
@@ -134,5 +146,15 @@ def get_local_config() -> Config | None:
 def get_config() -> Config:
     config = get_global_config()
     local_config = get_local_config()
+    if config is None and local_config is None:
+        logger.error("Could not load the global nor a local configuration, using an empty config")
+        return Config()
+    config = config if config is not None else Config()
+    local_config = local_config if local_config is not None else Config()
     config.update(local_config)
     return config
+
+
+def get_current_user() -> User:
+    config = get_config()
+    return config.user

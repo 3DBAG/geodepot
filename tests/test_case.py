@@ -1,5 +1,22 @@
+import pytest
+
 from geodepot.case import *
 from geodepot.data_file import DataFile
+
+
+@pytest.mark.parametrize(
+    "casespec,expected",
+    (
+        (
+            "wippolder/wippolder.gpkg",
+            CaseSpec(case_id="wippolder", data_file_name="wippolder.gpkg"),
+        ),
+        ("wippolder", CaseSpec(case_id="wippolder")),
+    ),
+)
+def test_casespec(casespec, expected):
+    """Can we parse the case specifier?"""
+    assert CaseSpec.from_str(casespec) == expected
 
 
 def test_case(data_dir):

@@ -24,7 +24,10 @@ Some of the requirements for the input data:
 
 ## Background
 
-- git, [git-lfs](https://git-lfs.com/)
+- git
+- [git-lfs](https://git-lfs.com/)
+- https://git-annex.branchable.com/, https://switowski.com/blog/git-annex/, https://www.youtube.com/watch?v=pp8IeGXpRRI&list=PLEQHbPfpVqU6esVrgqjfYybY394XD2qf2&index=5
+- https://www.datalad.org/
 - CMake's [FetchContent](https://cmake.org/cmake/help/latest/module/FetchContent.html#fetchcontent), [ExternalData](https://cmake.org/cmake/help/latest/module/ExternalData.html)
 
 ## High-level design
@@ -77,7 +80,7 @@ Initialising an empty repository, adding a case, adding a remote and uploading t
 ```shell
 cd my-project
 geodepot init
-geodepot add case-name /path/to/dir/with/data description
+geodepot add case-name /path/to/dir/with/data --description "text"
 geodepot remote add remote-name https://remote.url
 geodepot push remote-name
 ```
@@ -159,7 +162,7 @@ See [CMake custom commands](https://cmake.org/cmake/help/latest/guide/tutorial/A
 #### QGIS plugin
 Support adding, viewing, modifying cases.
 
-### Operations
+### Commands
 
 the commands that have the same name as in git, but do sth different are confusing
 
@@ -206,7 +209,70 @@ Return the full path to the specified data file of the specified case.
 
 #### add
 
-Adds a single case to the repository.
+**Synopsis**
+
+```shell
+geodepot add [-y] [--license=<text>] [--description=<text>] [--format=<format>] [--as-data] [<pathspec>...] <casespec>
+```
+
+**Description**
+
+In each operation, the case will be created if it does not exist.
+In each operation, existing values, data files are updated with the newly provided.
+
+**Options**
+
+`<casespec>`:
+Case (and data) specifier, in the form of `case-name[/data-name]`.
+Providing the case name `case-name` is mandatory, the data name `data-name` within the case is optional.
+The rest of the options will affect the specified level, either the whole case with `case-name`, or just a single data within the case with `case-name/data-name`.
+For example, `wippolder/wippolder.gpkg`, where `wippolder` is the case name, `wippolder.gpkg` is the data name.
+
+`<pathspec>`:
+Path specifier for the data files to add to the case.
+Can be a path to a single file, a directory or a fileglob (e.g. `*.gpkg`).
+Can be passed multiple times.
+Only local files are supported.
+
+`-y`: 
+Do not require confirmation for upating existing values or files.
+
+`--license=<text>`: 
+A license to add to the data.
+
+`--description=<text>`: 
+A description to add to the case or data.
+
+`--format=<format>`: 
+A format to force on the data in case it cannot be inferred automatically, or the inferred format is not correct.
+If the a whole directory is added as a single data entry with `--as-data`, the automatic format inference doesn't work, and it may be necessary to force a format.
+Note that when the format is forced, the bounding box calculation and hashing does not work.
+
+`--as-data`:
+Add a whole directory as a single data entry.
+The default behaviour is to add each file in the directory as a separate data entry.
+If `--as-data` is set, the bounding box and file hash cannot be computed for the data.
+
+**Examples**
+
+Add multiple files as data entries to a case.
+If the case does not exist, it will be created as `case-name` and the file `file-name` is moved into it.
+
+```shell
+geodepot add /path/to/file-name1 /path/to/file-name2 case-name
+```
+
+Update the license and description of a data entry (`file-name`) in a case (`case-name`).
+
+```shell
+geodepot add --description "long description\nmultiline" --license "CC-0" case-name/file-name1
+```
+
+Update the description of a case (`case-name`)
+
+```shell
+geodepot add --description "new description of the case" case-name
+```
 
 #### remove
 
@@ -453,6 +519,8 @@ The installer script,
 
 ## Notes
 
+I was assuming that a data file is a single file, but what if a data file is a directory of files? Like 3DTiles or a Shapefile?
+
 ssh://gilfoyle/data/work/bdukai/geodepot/.geodepot/index.geojson
 
 Probably OO would be neat, like having a `Case` and `CaseCollection` (serialised to the INDEX) with their methods.
@@ -468,6 +536,19 @@ Hash of the archive is required, for checking if new version needs to be downloa
 Mimic cmake's fetchcontent.
 
 git lfs could be sth to use, but maybe overkill because need to set up and operate a remote server. Would be better not to use any server.
+
+## TODOs
+
+- Read license from a file
+- Optimizations:
+  - import only the used functions
+  - while loop instead of for loop
+  - generators, list comprehension
+  - flatten nested conditionals
+  - choose tuple over list
+- Improve repository discovery so that the project repository is found even from subdirectories. See how Git does it with [`GIT_DIR` et al.](https://git-scm.com/book/en/v2/Git-Internals-Environment-Variables).
+- Robust CityJSONSeq import, so that the metadata can be a separate file.
+- Import a whole directory of data files as a case.
 
 
 

@@ -3,20 +3,29 @@ import pytest
 from geodepot.config import *
 
 
-@pytest.fixture
-def mock_user_home(monkeypatch, data_dir):
-    def mockreturn():
-        return data_dir / "mock_user_home"
-
-    monkeypatch.setattr(Path, "home", mockreturn)
-
-
-@pytest.fixture
-def mock_project_dir(monkeypatch, data_dir):
-    def mockreturn():
-        return data_dir / "mock_project"
-
-    monkeypatch.setattr(Path, "cwd", mockreturn)
+@pytest.mark.parametrize(
+    "config_dict,expected",
+    (
+        (dict(), dict()),
+        (
+            {"user": {"name": "myname", "email": "<EMAIL>"}},
+            Config(user=User(name="myname", email="<EMAIL>")),
+        ),
+        (
+            {
+                "user": {"name": "myname", "email": "<EMAIL>"},
+                "remotes": {"myremote": {"url": "myurl"}},
+            },
+            Config(
+                user=User(name="myname", email="<EMAIL>"),
+                remotes=[Remote(name="myremote", url="myurl")],
+            ),
+        ),
+    ),
+)
+def test_as_config(config_dict: dict, expected: Config):
+    """Can we decode a configuration JSON object?"""
+    assert as_config(config_dict) == expected
 
 
 def test_read_global_config(mock_user_home):
@@ -40,7 +49,10 @@ def test_read_local_config(mock_project_dir):
         (
             Config(user=User(name="name", email="email")),
             Config(remotes=[Remote(name="remote-name", url="url")]),
-            Config(user=User(name="name", email="email"), remotes=[Remote(name="remote-name", url="url")]),
+            Config(
+                user=User(name="name", email="email"),
+                remotes=[Remote(name="remote-name", url="url")],
+            ),
         ),
     ),
 )

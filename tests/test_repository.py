@@ -19,14 +19,12 @@ def test_empty(mock_temp_project):
     print(repo)
 
 
-def test_with_cases(mock_temp_project, data_dir):
+def test_add(mock_temp_project, data_dir):
     repo = Repository()
     repo.init()
 
-    case = Case("wippolder", "Some case description.\nMultiline.\nText")
-    for df in ("wippolder.gpkg", "wippolder.las", "3dbag_one.city.json"):
-        case.add_data_file(DataFile(data_dir / df))
-    repo.index.add_case(case)
+    repo.add("wippolder", pathspec=str(data_dir/"wippolder.gpkg"),
+             description="wippolder case description", license="CC-0")
 
     # fishy
     repo.index.serialize(repo.path.joinpath("index.geojson"))
