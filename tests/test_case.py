@@ -1,5 +1,5 @@
-from geodepot.data_file import DataFile
 from geodepot.case import *
+from geodepot.data_file import DataFile
 
 
 def test_case(data_dir):

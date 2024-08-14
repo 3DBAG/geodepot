@@ -1,15 +1,15 @@
 import json
-from pathlib import Path
-from typing import Self
 import logging
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Self
 
+from geodepot import GEODEPOT_CONFIG_GLOBAL, GEODEPOT_CONFIG_LOCAL
 from geodepot.encode import DataClassEncoder
 
 logger = logging.getLogger(__name__)
 
-GEODEPOT_CONFIG_GLOBAL = ".geodepotconfig.json"
-GEODEPOT_CONFIG_LOCAL = "config.json"
+JSON_INDENT = 2
 
 
 @dataclass(repr=True)
@@ -17,8 +17,8 @@ class User:
     name: str
     email: str
 
-    def as_json_str(self) -> str:
-        return json.dumps(self, cls=DataClassEncoder)
+    def to_json(self) -> str:
+        return json.dumps(self, cls=DataClassEncoder, indent=JSON_INDENT)
 
 
 def as_user(dct: dict) -> User | dict:
@@ -33,8 +33,8 @@ class Remote:
     name: str
     url: str
 
-    def as_json_str(self) -> str:
-        return json.dumps(self, cls=DataClassEncoder)
+    def to_json(self) -> str:
+        return json.dumps(self, cls=DataClassEncoder, indent=JSON_INDENT)
 
 
 def as_remote(dct: dict) -> Remote | dict:
@@ -57,11 +57,10 @@ class Config:
 
     def write_to_file(self, path: Path) -> None:
         logger.debug(f"Writing config to file: {path}")
-        with path.open("w") as f:
-            json.dump(self, f, cls=config_encoder)
+        path.write_text(self.to_json())
 
-    def as_json_str(self) -> str:
-        return json.dumps(self, cls=config_encoder)
+    def to_json(self) -> str:
+        return json.dumps(self, cls=config_encoder, indent=JSON_INDENT)
 
     def update(self, other: Self):
         """Updates the values of self with the values from another Config instance."""
@@ -88,8 +87,8 @@ def as_config(dct: dict) -> Config | dict:
 
 
 def multiencoder_factory(*encoders):
-    """Required when using multiple JSONEncoders.
-    https://stackoverflow.com/a/76931520/3717824
+    """Required when using multiple JSONEncoders and/or nested dataclasses.
+    Ref.: https://stackoverflow.com/a/76931520/3717824
     """
 
     class MultipleJsonEncoders(json.JSONEncoder):

@@ -1,16 +1,20 @@
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-import logging
 
 from osgeo import ogr, gdal
+
 gdal.UseExceptions()
 ogr.UseExceptions()
 
+from geodepot import GEODEPOT_CONFIG_LOCAL, GEODEPOT_INDEX
 from geodepot.case import Case
+from geodepot.config import Config
 
 logger = logging.getLogger(__name__)
 
 
+# to update index: https://pcjericks.github.io/py-gdalogr-cookbook/vector_layers.html#load-data-to-memory
 @dataclass(repr=True)
 class Index:
     cases: list[Case] = field(default_factory=list)
@@ -75,5 +79,6 @@ class Repository:
             self.path.mkdir()
             self.path.joinpath("cases").mkdir()
             self.index = Index()
-            self.index.serialize(self.path.joinpath("index.geojson"))
+            self.index.serialize(self.path.joinpath(GEODEPOT_INDEX))
+            Config().write_to_file(self.path.joinpath(GEODEPOT_CONFIG_LOCAL))
             logger.info(f"Empty geodepot repository created at {self.path}")

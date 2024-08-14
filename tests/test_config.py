@@ -29,20 +29,24 @@ def test_read_local_config(mock_project_dir):
     assert config.remotes[0].name == "remote-name"
 
 
-def test_read_combined_config(mock_user_home, mock_project_dir):
-    config = get_config()
-    assert config.remotes is not None
-    assert config.user is not None
-
-
-def test_as_json():
-    config_new = Config(
-        user=User(
-            name="<NAME>",
-            email="<EMAIL>",
-        )
-    )
-    assert "<NAME>" in config_new.as_json_str()
+@pytest.mark.parametrize(
+    "config_global,config_local,expected",
+    (
+        (
+            Config(user=User(name="name", email="email")),
+            Config(),
+            Config(user=User(name="name", email="email")),
+        ),
+        (
+            Config(user=User(name="name", email="email")),
+            Config(remotes=[Remote(name="remote-name", url="url")]),
+            Config(user=User(name="name", email="email"), remotes=[Remote(name="remote-name", url="url")]),
+        ),
+    ),
+)
+def test_update(config_global, config_local, expected):
+    config_global.update(config_local)
+    assert config_global == expected
 
 
 def test_write_config(mock_user_home, tmp_path):

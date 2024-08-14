@@ -1,6 +1,6 @@
+import hashlib
 import json
 from enum import Enum, auto
-import hashlib
 from pathlib import Path
 
 import pdal

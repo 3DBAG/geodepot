@@ -1,7 +1,7 @@
 import pytest
 
-from geodepot.repository import *
 from geodepot.data_file import DataFile
+from geodepot.repository import *
 
 
 @pytest.fixture
