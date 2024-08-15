@@ -1,19 +1,20 @@
-import hashlib
-import json
-import logging
 from dataclasses import dataclass
 from enum import Enum, auto
+from hashlib import file_digest
+from json import dumps, load
+from logging import getLogger
 from pathlib import Path
 
-import pdal
-from osgeo import ogr, gdal
+from osgeo.gdal import Open as gdalOpen, UseExceptions as gdalUseExceptions
+from osgeo.ogr import Open as ogrOpen, UseExceptions as ogrUseExceptions
+from pdal import Reader, Pipeline
 
 from geodepot.config import User
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
-gdal.UseExceptions()
-ogr.UseExceptions()
+gdalUseExceptions()
+ogrUseExceptions()
 
 pdal_filter_stats = {"type": "filters.stats", "dimensions": "X,Y"}
 
@@ -63,7 +64,7 @@ class DataFile:
     @staticmethod
     def __compute_sha1(path: Path) -> str:
         with path.open("rb") as f:
-            return hashlib.file_digest(f, "sha1").hexdigest()
+            return file_digest(f, "sha1").hexdigest()
 
     @staticmethod
     def __infer_format(path: Path) -> tuple[Drivers, str]:
@@ -83,7 +84,7 @@ class DataFile:
     def __compute_bbox(self, path: Path) -> tuple[float, float, float, float]:
         if self.driver == Drivers.CITYJSON:
             with path.open() as f:
-                cj = json.load(f)
+                cj = load(f)
                 if "vertices" in cj:
                     t = cj.get(
                         "transform",
@@ -113,12 +114,12 @@ class DataFile:
         elif self.driver == Drivers.GDAL:
             raise NotImplementedError
         elif self.driver == Drivers.OGR:
-            with ogr.Open(path) as ogr_dataset:
+            with ogrOpen(path) as ogr_dataset:
                 lyr = ogr_dataset.GetLayer(0)
                 return lyr.GetExtent(force=True)
                 # lyr.GetSpatialRef().ExportToWkt()
         elif self.driver == Drivers.PDAL:
-            pdal_pipeline = pdal.Pipeline(json.dumps([str(path), pdal_filter_stats]))
+            pdal_pipeline = Pipeline(dumps([str(path), pdal_filter_stats]))
             pdal_pipeline.execute()
             stats = pdal_pipeline.metadata["metadata"]["filters.stats"]["statistic"]
             x_max = stats[0]["maximum"]
@@ -133,7 +134,7 @@ class DataFile:
 
 def try_pdal(path: Path) -> str | None:
     try:
-        reader = pdal.Reader(path)
+        reader = Reader(path)
         if reader.type is not None and reader.type != "":
             return reader.type.replace("readers.", "")
         else:
@@ -144,7 +145,7 @@ def try_pdal(path: Path) -> str | None:
 
 def try_ogr(path: Path) -> str | None:
     try:
-        with ogr.Open(path) as ogr_dataset:
+        with ogrOpen(path) as ogr_dataset:
             return ogr_dataset.GetDriver().GetName()
     except RuntimeError:
         return None
@@ -152,7 +153,7 @@ def try_ogr(path: Path) -> str | None:
 
 def try_gdal(path: Path) -> str | None:
     try:
-        with gdal.Open(path) as gdal_dataset:
+        with gdalOpen(path) as gdal_dataset:
             return gdal_dataset.GetDriver().GetName()
     except RuntimeError:
         return None

@@ -1,16 +1,17 @@
-import logging
 from dataclasses import dataclass, field
+from logging import getLogger
 from pathlib import Path
 
-from osgeo import ogr
+from osgeo.ogr import UseExceptions, FieldDefn, FeatureDefn, OFTString, wkbPolygon, \
+    wkbLinearRing, GetDriverByName, Feature, Geometry
 
-ogr.UseExceptions()
+UseExceptions()
 
 from geodepot import GEODEPOT_CONFIG_LOCAL, GEODEPOT_INDEX
 from geodepot.case import CaseId, Case, CaseSpec
 from geodepot.config import Config, get_current_user
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
 # to update index: https://pcjericks.github.io/py-gdalogr-cookbook/vector_layers.html#load-data-to-memory
@@ -19,21 +20,21 @@ class Index:
     cases: dict[CaseId, Case] = field(default_factory=dict)
 
     def serialize(self, path: Path):
-        defn = ogr.FeatureDefn()
-        defn.AddFieldDefn(ogr.FieldDefn("case_id", ogr.OFTString))
-        defn.AddFieldDefn(ogr.FieldDefn("case_description", ogr.OFTString))
-        defn.AddFieldDefn(ogr.FieldDefn("case_sha1", ogr.OFTString))
-        defn.AddFieldDefn(ogr.FieldDefn("file_name", ogr.OFTString))
-        defn.AddFieldDefn(ogr.FieldDefn("file_sha1", ogr.OFTString))
-        defn.AddFieldDefn(ogr.FieldDefn("file_description", ogr.OFTString))
-        defn.AddFieldDefn(ogr.FieldDefn("file_format", ogr.OFTString))
-        defn.AddFieldDefn(ogr.FieldDefn("file_changed_by", ogr.OFTString))
-        defn.AddFieldDefn(ogr.FieldDefn("file_license", ogr.OFTString))
-        with ogr.GetDriverByName("GeoJSON").CreateDataSource(path) as ds:
-            lyr = ds.CreateLayer("index", geom_type=ogr.wkbPolygon)
+        defn = FeatureDefn()
+        defn.AddFieldDefn(FieldDefn("case_id", OFTString))
+        defn.AddFieldDefn(FieldDefn("case_description", OFTString))
+        defn.AddFieldDefn(FieldDefn("case_sha1", OFTString))
+        defn.AddFieldDefn(FieldDefn("file_name", OFTString))
+        defn.AddFieldDefn(FieldDefn("file_sha1", OFTString))
+        defn.AddFieldDefn(FieldDefn("file_description", OFTString))
+        defn.AddFieldDefn(FieldDefn("file_format", OFTString))
+        defn.AddFieldDefn(FieldDefn("file_changed_by", OFTString))
+        defn.AddFieldDefn(FieldDefn("file_license", OFTString))
+        with GetDriverByName("GeoJSON").CreateDataSource(path) as ds:
+            lyr = ds.CreateLayer("index", geom_type=wkbPolygon)
             for case_id, case in self.cases.items():
                 for data in case.data_files:
-                    feat = ogr.Feature(defn)
+                    feat = Feature(defn)
                     feat["case_id"] = case_id
                     feat["case_description"] = case.description
                     feat["case_sha1"] = case.sha1
@@ -43,13 +44,13 @@ class Index:
                     feat["file_format"] = data.format
                     feat["file_changed_by"] = data.changed_by.to_pretty() if data.changed_by is not None else None
                     feat["file_license"] = data.license
-                    ring = ogr.Geometry(ogr.wkbLinearRing)
+                    ring = Geometry(wkbLinearRing)
                     ring.AddPoint(data.bbox[0], data.bbox[2])
                     ring.AddPoint(data.bbox[1], data.bbox[2])
                     ring.AddPoint(data.bbox[1], data.bbox[3])
                     ring.AddPoint(data.bbox[0], data.bbox[3])
                     ring.AddPoint(data.bbox[0], data.bbox[2])
-                    poly = ogr.Geometry(ogr.wkbPolygon)
+                    poly = Geometry(wkbPolygon)
                     poly.AddGeometry(ring)
                     feat.SetGeometry(poly)
                     lyr.CreateFeature(feat)

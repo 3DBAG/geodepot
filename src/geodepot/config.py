@@ -1,13 +1,13 @@
-import json
-import logging
 from dataclasses import dataclass
+from json import dumps, load, JSONEncoder
+from logging import getLogger
 from pathlib import Path
 from typing import Self
 
 from geodepot import GEODEPOT_CONFIG_GLOBAL, GEODEPOT_CONFIG_LOCAL
 from geodepot.encode import DataClassEncoder
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 JSON_INDENT = 2
 
@@ -18,7 +18,7 @@ class User:
     email: str
 
     def to_json(self) -> str:
-        return json.dumps(self, cls=DataClassEncoder, indent=JSON_INDENT)
+        return dumps(self, cls=DataClassEncoder, indent=JSON_INDENT)
 
     def to_pretty(self) -> str:
         return f"{self.name} <{self.email}>"
@@ -37,7 +37,7 @@ class Remote:
     url: str
 
     def to_json(self) -> str:
-        return json.dumps(self, cls=DataClassEncoder, indent=JSON_INDENT)
+        return dumps(self, cls=DataClassEncoder, indent=JSON_INDENT)
 
 
 def as_remote(dct: dict) -> Remote | dict:
@@ -56,7 +56,7 @@ class Config:
     def read_from_file(cls, path: Path) -> Self:
         logger.debug(f"Reading config from file: {path}")
         with path.open() as f:
-            c = json.load(f, object_hook=as_config)
+            c = load(f, object_hook=as_config)
             # An empty config is serialized as an empty JSON object '{}', so the
             # deserializer 'as_config' will return a dict and not an empty Config
             # instance.
@@ -67,7 +67,7 @@ class Config:
         path.write_text(self.to_json())
 
     def to_json(self) -> str:
-        return json.dumps(self, cls=config_encoder, indent=JSON_INDENT)
+        return dumps(self, cls=config_encoder, indent=JSON_INDENT)
 
     def update(self, other: Self):
         """Updates the values of self with the values from another Config instance."""
@@ -103,7 +103,7 @@ def multiencoder_factory(*encoders):
     Ref.: https://stackoverflow.com/a/76931520/3717824
     """
 
-    class MultipleJsonEncoders(json.JSONEncoder):
+    class MultipleJsonEncoders(JSONEncoder):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
             self.encoders = [encoder(*args, **kwargs) for encoder in encoders]

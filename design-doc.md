@@ -541,8 +541,7 @@ git lfs could be sth to use, but maybe overkill because need to set up and opera
 
 - Read license from a file
 - Optimizations:
-  - import only the used functions
-  - while loop instead of for loop
+  - ~~import only the used functions~~
   - generators, list comprehension
   - flatten nested conditionals
   - choose tuple over list
