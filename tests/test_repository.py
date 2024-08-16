@@ -29,5 +29,5 @@ def test_add(mock_temp_project, mock_user_home, data_dir):
              description="wippolder case description", license="CC-0")
 
     # fishy
-    repo.index.serialize(repo.path.joinpath("index.csv"))
+    repo.index.serialize(repo.path.joinpath("index.geojson"))
     print(repo)

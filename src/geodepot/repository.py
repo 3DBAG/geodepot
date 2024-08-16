@@ -53,18 +53,12 @@ class Index:
             # We simple write a new index on serialization
             if path.exists():
                 path.exists()
-            with GetDriverByName("CSV").CreateDataSource(path) as ds:
+            with GetDriverByName("GeoJSON").CreateDataSource(path) as ds:
                 # Layer definition
                 lyr = ds.CreateLayer(
                     "index",
                     srs=INDEX_SRS,
                     geom_type=wkbPolygon,
-                    options={
-                        "GEOMETRY": "AS_WKT",
-                        "SEPARATOR": "COMMA",
-                        "STRING_QUOTING": "ALWAYS",
-                        "WRITE_BOM": "YES",
-                    },
                 )
                 lyr.CreateFields(INDEX_FIELD_DEFINITIONS)
                 # Feature definition
