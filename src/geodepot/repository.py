@@ -1,18 +1,18 @@
 from dataclasses import dataclass, field
 from logging import getLogger
 from pathlib import Path
+from shutil import copy2, copytree
 
 from osgeo.ogr import (
     UseExceptions,
-Open,
-GetDriverByName,
+    GetDriverByName,
     FieldDefn,
     FeatureDefn,
     OFTString,
     OFTInteger64,
     wkbPolygon,
     Feature,
-    OGRERR_NONE
+    OGRERR_NONE,
 )
 from osgeo.osr import SpatialReference
 
@@ -38,7 +38,7 @@ INDEX_FIELD_DEFINITIONS = (
     FieldDefn("file_changed_by", OFTString),
     FieldDefn("file_license", OFTString),
     FieldDefn("file_srs", OFTString),
-    FieldDefn("file_extent_original_srs", OFTString)
+    FieldDefn("file_extent_original_srs", OFTString),
 )
 
 
@@ -92,7 +92,9 @@ class Index:
                                 data.bbox.bbox_epsg_3857.to_ogr_geometry_wkbpolygon()
                             )
                         if lyr.CreateFeature(feat) != OGRERR_NONE:
-                            logger.error(f"Failed to create OGR Feature on the layer from {data}")
+                            logger.error(
+                                f"Failed to create OGR Feature on the layer from {data}"
+                            )
                         fid += 1
         except Exception as e:
             logger.critical(f"Failed to serialize index with exception {e}")
@@ -111,6 +113,10 @@ class Index:
 class Repository:
     path: Path = field(default_factory=lambda: Path.cwd() / ".geodepot")
     index: Index | None = None
+
+    @property
+    def path_cases(self):
+        return self.path / "cases"
 
     def init(self, url: str = None):
         if self.path.exists():
@@ -137,20 +143,18 @@ class Repository:
         as_data: bool = False,
         yes: bool = True,
     ):
-        cs = CaseSpec.from_str(casespec)
+        casespec = CaseSpec.from_str(casespec)
         if not yes:
             raise NotImplementedError
         # Determine if we need to update a case's description or a data's description
         case_description = None
         data_description = None
-        if cs.data_file_name is not None:
+        if casespec.data_file_name is not None:
             data_description = description
         else:
             case_description = description
         # Get an existing case or create an new if not exists
-        case = self.index.cases.get(
-            cs.case_name, Case(name=cs.case_name, description=case_description)
-        )
+        case = self.get_case(casespec)
         # Update the description of an existing case
         if case_description is not None:
             case.description = case_description
@@ -164,15 +168,50 @@ class Repository:
                 description=data_description,
                 changed_by=get_current_user(),
             )
+            self.copy_data(p, casespec)
             logger.info(f"Added {df.name} to {case.name}")
-        self.index.cases[cs.case_name] = case
+        self.index.cases[casespec.case_name] = case
+
+    def get_case(self, casespec: CaseSpec) -> Case:
+        """Retrive an existing case or initialize a new one."""
+        if (case := self.index.cases.get(casespec.case_name)) is None:
+            case = Case(name=casespec.case_name, description=None)
+            self.path_cases.joinpath( casespec.case_name).mkdir()
+        return case
+
+    def copy_data(self, path: Path, casespec: CaseSpec):
+        """Copies a data entry into the repository."""
+        if path.is_file():
+            if casespec.data_file_name is not None:
+                # Rename the file when copied into the case
+                copy2(
+                    path,
+                    self.path_cases.joinpath( casespec.case_name, casespec.data_file_name),
+                )
+            else:
+                # Keep the file name
+                copy2(path, self.path_cases.joinpath( casespec.case_name, path.name))
+        else:
+            if casespec.data_file_name is not None:
+                # Copying a directory as a single data entry under a new name
+                copytree(
+                    path,
+                    self.path_cases.joinpath( casespec.case_name, casespec.data_file_name),
+                    dirs_exist_ok=True,
+                )
+            else:
+                copytree(
+                    path,
+                    self.path_cases.joinpath( casespec.case_name, path.name),
+                    dirs_exist_ok=True,
+                )
 
 
 def parse_pathspec(pathspec: str, as_data: bool = False) -> list[Path]:
     """Parse a path specifier and return a list of Paths that needs to be added to the
     case.
     :param pathspec: Can be relative or absolute path or a fileglob. Fileglobs cannot be used together with `as_data`.
-    :param as_data: Treat a directory as a single file. Only has effect if `pathspec` is a path to a directory.
+    :param as_data: Treat a directory as a single file, effectively returning a single path. Only has effect if `pathspec` is a path to a directory.
     :return: List of paths.
     """
     if (is_glob := "*" in pathspec) is not True:

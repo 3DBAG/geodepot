@@ -24,21 +24,16 @@ class CaseSpec:
 @dataclass(repr=True)
 class Case:
     name: CaseName
-    description: str
-    sha1: str = None
+    description: str | None
+    sha1: str | None = None
     data_files: list[DataFile] = field(default_factory=list)
     # todo: need to create case directory if not exists
 
-    def add_path(
-        self,
-        path: Path,
-        data_license: str = None,
-        format: str = None,
-        description: str = None,
-        changed_by: User = None,
-    ) -> DataFile:
+    def add_path(self, source_path: Path, data_license: str = None,
+                 format: str = None, description: str = None,
+                 changed_by: User = None) -> DataFile:
         df = DataFile(
-            path,
+            source_path,
             data_license=data_license,
             data_format=format,
             description=description,
