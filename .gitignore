@@ -16,3 +16,6 @@
 /experiments/vcpkg/vcpkg/
 /experiments/vcpkg/.idea
 /experiments/vcpkg/.run
+
+# Data
+/tests/data/proj.db

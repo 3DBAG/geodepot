@@ -6,7 +6,7 @@ from geodepot.data_file import *
 @pytest.mark.parametrize(
     "file_name", ("wippolder.gpkg", "wippolder.las", "3dbag_one.city.json")
 )
-def test_data_file(data_dir, file_name):
+def test_data_file(mock_proj_lib, data_dir, file_name):
     """Can we initialize a DataFile from a local file?"""
     data_file = DataFile(data_dir / file_name, "CC-0")
     assert data_file.bbox is not None

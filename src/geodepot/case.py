@@ -3,17 +3,17 @@ from pathlib import Path
 from typing import Self, NewType
 
 from geodepot.config import User
-from geodepot.data_file import DataFile
+from geodepot.data_file import DataFile, DataFileName
 
-CaseId = NewType("CaseId", str)
+CaseName = NewType("CaseName", str)
 
 
 @dataclass
 class CaseSpec:
     """Case specifier."""
 
-    case_id: CaseId | None = None
-    data_file_name: str | None = None
+    case_name: CaseName | None = None
+    data_file_name: DataFileName | None = None
 
     @classmethod
     def from_str(cls, casespec: str) -> Self:
@@ -23,7 +23,7 @@ class CaseSpec:
 
 @dataclass(repr=True)
 class Case:
-    id: CaseId
+    name: CaseName
     description: str
     sha1: str = None
     data_files: list[DataFile] = field(default_factory=list)

@@ -539,6 +539,8 @@ git lfs could be sth to use, but maybe overkill because need to set up and opera
 
 ## TODOs
 
+- Try building wheels for the deps, so that geodepot is pip-installable
+- Get bbox of rasters
 - Read license from a file
 - Optimizations:
   - ~~import only the used functions~~
@@ -547,7 +549,6 @@ git lfs could be sth to use, but maybe overkill because need to set up and opera
   - choose tuple over list
 - Improve repository discovery so that the project repository is found even from subdirectories. See how Git does it with [`GIT_DIR` et al.](https://git-scm.com/book/en/v2/Git-Internals-Environment-Variables).
 - Robust CityJSONSeq import, so that the metadata can be a separate file.
-- Import a whole directory of data files as a case.
 
 
 

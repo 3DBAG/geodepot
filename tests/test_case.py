@@ -9,9 +9,9 @@ from geodepot.data_file import DataFile
     (
         (
             "wippolder/wippolder.gpkg",
-            CaseSpec(case_id="wippolder", data_file_name="wippolder.gpkg"),
+            CaseSpec(case_name="wippolder", data_file_name="wippolder.gpkg"),
         ),
-        ("wippolder", CaseSpec(case_id="wippolder")),
+        ("wippolder", CaseSpec(case_name="wippolder")),
     ),
 )
 def test_casespec(casespec, expected):

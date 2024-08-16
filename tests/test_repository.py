@@ -19,13 +19,15 @@ def test_empty(mock_temp_project):
     print(repo)
 
 
-def test_add(mock_temp_project, data_dir):
+def test_add(mock_temp_project, mock_user_home, data_dir):
     repo = Repository()
     repo.init()
 
     repo.add("wippolder", pathspec=str(data_dir/"wippolder.gpkg"),
              description="wippolder case description", license="CC-0")
+    repo.add("wippolder", pathspec=str(data_dir/"wippolder.las"),
+             description="wippolder case description", license="CC-0")
 
     # fishy
-    repo.index.serialize(repo.path.joinpath("index.geojson"))
+    repo.index.serialize(repo.path.joinpath("index.csv"))
     print(repo)

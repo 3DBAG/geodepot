@@ -2,61 +2,109 @@ from dataclasses import dataclass, field
 from logging import getLogger
 from pathlib import Path
 
-from osgeo.ogr import UseExceptions, FieldDefn, FeatureDefn, OFTString, wkbPolygon, \
-    wkbLinearRing, GetDriverByName, Feature, Geometry
+from osgeo.ogr import (
+    UseExceptions,
+Open,
+GetDriverByName,
+    FieldDefn,
+    FeatureDefn,
+    OFTString,
+    OFTInteger64,
+    wkbPolygon,
+    Feature,
+    OGRERR_NONE
+)
+from osgeo.osr import SpatialReference
 
 UseExceptions()
 
-from geodepot import GEODEPOT_CONFIG_LOCAL, GEODEPOT_INDEX
-from geodepot.case import CaseId, Case, CaseSpec
+from geodepot import GEODEPOT_CONFIG_LOCAL, GEODEPOT_INDEX, GEODEPOT_INDEX_EPSG
+from geodepot.case import CaseName, Case, CaseSpec
 from geodepot.config import Config, get_current_user
 
 logger = getLogger(__name__)
+
+INDEX_SRS = SpatialReference()
+INDEX_SRS.ImportFromEPSG(GEODEPOT_INDEX_EPSG)
+INDEX_FIELD_DEFINITIONS = (
+    FieldDefn("fid", OFTInteger64),
+    FieldDefn("case_name", OFTString),
+    FieldDefn("case_sha1", OFTString),
+    FieldDefn("case_description", OFTString),
+    FieldDefn("file_name", OFTString),
+    FieldDefn("file_sha1", OFTString),
+    FieldDefn("file_description", OFTString),
+    FieldDefn("file_format", OFTString),
+    FieldDefn("file_changed_by", OFTString),
+    FieldDefn("file_license", OFTString),
+    FieldDefn("file_srs", OFTString),
+    FieldDefn("file_extent_original_srs", OFTString)
+)
 
 
 # to update index: https://pcjericks.github.io/py-gdalogr-cookbook/vector_layers.html#load-data-to-memory
 @dataclass(repr=True)
 class Index:
-    cases: dict[CaseId, Case] = field(default_factory=dict)
+    cases: dict[CaseName, Case] = field(default_factory=dict)
 
     def serialize(self, path: Path):
-        defn = FeatureDefn()
-        defn.AddFieldDefn(FieldDefn("case_id", OFTString))
-        defn.AddFieldDefn(FieldDefn("case_description", OFTString))
-        defn.AddFieldDefn(FieldDefn("case_sha1", OFTString))
-        defn.AddFieldDefn(FieldDefn("file_name", OFTString))
-        defn.AddFieldDefn(FieldDefn("file_sha1", OFTString))
-        defn.AddFieldDefn(FieldDefn("file_description", OFTString))
-        defn.AddFieldDefn(FieldDefn("file_format", OFTString))
-        defn.AddFieldDefn(FieldDefn("file_changed_by", OFTString))
-        defn.AddFieldDefn(FieldDefn("file_license", OFTString))
-        with GetDriverByName("GeoJSON").CreateDataSource(path) as ds:
-            lyr = ds.CreateLayer("index", geom_type=wkbPolygon)
-            for case_id, case in self.cases.items():
-                for data in case.data_files:
-                    feat = Feature(defn)
-                    feat["case_id"] = case_id
-                    feat["case_description"] = case.description
-                    feat["case_sha1"] = case.sha1
-                    feat["file_name"] = data.name
-                    feat["file_sha1"] = data.sha1
-                    feat["file_description"] = data.description
-                    feat["file_format"] = data.format
-                    feat["file_changed_by"] = data.changed_by.to_pretty() if data.changed_by is not None else None
-                    feat["file_license"] = data.license
-                    ring = Geometry(wkbLinearRing)
-                    ring.AddPoint(data.bbox[0], data.bbox[2])
-                    ring.AddPoint(data.bbox[1], data.bbox[2])
-                    ring.AddPoint(data.bbox[1], data.bbox[3])
-                    ring.AddPoint(data.bbox[0], data.bbox[3])
-                    ring.AddPoint(data.bbox[0], data.bbox[2])
-                    poly = Geometry(wkbPolygon)
-                    poly.AddGeometry(ring)
-                    feat.SetGeometry(poly)
-                    lyr.CreateFeature(feat)
+        try:
+            fid = 0
+            # We simple write a new index on serialization
+            if path.exists():
+                path.exists()
+            with GetDriverByName("CSV").CreateDataSource(path) as ds:
+                # Layer definition
+                lyr = ds.CreateLayer(
+                    "index",
+                    srs=INDEX_SRS,
+                    geom_type=wkbPolygon,
+                    options={
+                        "GEOMETRY": "AS_WKT",
+                        "SEPARATOR": "COMMA",
+                        "STRING_QUOTING": "ALWAYS",
+                        "WRITE_BOM": "YES",
+                    },
+                )
+                lyr.CreateFields(INDEX_FIELD_DEFINITIONS)
+                # Feature definition
+                defn = FeatureDefn()
+                for fdef in INDEX_FIELD_DEFINITIONS:
+                    defn.AddFieldDefn(fdef)
+
+                for case_name, case in self.cases.items():
+                    for data in case.data_files:
+                        feat = Feature(defn)
+                        feat["fid"] = fid
+                        feat["case_name"] = case_name
+                        feat["case_sha1"] = case.sha1
+                        feat["case_description"] = case.description
+                        feat["file_name"] = data.name
+                        feat["file_sha1"] = data.sha1
+                        feat["file_description"] = data.description
+                        feat["file_format"] = data.format
+                        feat["file_changed_by"] = (
+                            data.changed_by.to_pretty()
+                            if data.changed_by is not None
+                            else None
+                        )
+                        feat["file_license"] = data.license
+                        feat["file_srs"] = data.bbox.srs_wkt
+                        feat["file_extent_original_srs"] = (
+                            data.bbox.bbox_original_srs.to_wkt()
+                        )
+                        if data.bbox.bbox_epsg_3857 is not None:
+                            feat.SetGeometry(
+                                data.bbox.bbox_epsg_3857.to_ogr_geometry_wkbpolygon()
+                            )
+                        if lyr.CreateFeature(feat) != OGRERR_NONE:
+                            logger.error(f"Failed to create OGR Feature on the layer from {data}")
+                        fid += 1
+        except Exception as e:
+            logger.critical(f"Failed to serialize index with exception {e}")
 
     def add_case(self, case):
-        self.cases[case.id] = case
+        self.cases[case.name] = case
 
     def to_json_str(self) -> str:
         return "{}"
@@ -107,7 +155,7 @@ class Repository:
             case_description = description
         # Get an existing case or create an new if not exists
         case = self.index.cases.get(
-            cs.case_id, Case(id=cs.case_id, description=case_description)
+            cs.case_name, Case(name=cs.case_name, description=case_description)
         )
         # Update the description of an existing case
         if case_description is not None:
@@ -122,8 +170,8 @@ class Repository:
                 description=data_description,
                 changed_by=get_current_user(),
             )
-            logger.info(f"Added {df.name} to {case.id}")
-        self.index.cases[cs.case_id] = case
+            logger.info(f"Added {df.name} to {case.name}")
+        self.index.cases[cs.case_name] = case
 
 
 def parse_pathspec(pathspec: str, as_data: bool = False) -> list[Path]:

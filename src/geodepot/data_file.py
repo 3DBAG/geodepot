@@ -4,11 +4,20 @@ from hashlib import file_digest
 from json import dumps, load
 from logging import getLogger
 from pathlib import Path
+from typing import NewType
 
 from osgeo.gdal import Open as gdalOpen, UseExceptions as gdalUseExceptions
-from osgeo.ogr import Open as ogrOpen, UseExceptions as ogrUseExceptions
+from osgeo.ogr import (
+    Open as ogrOpen,
+    UseExceptions as ogrUseExceptions,
+    Geometry,
+    wkbPolygon,
+    wkbLinearRing,
+)
+from osgeo.osr import SpatialReference, CreateCoordinateTransformation
 from pdal import Reader, Pipeline
 
+from geodepot import GEODEPOT_INDEX_EPSG
 from geodepot.config import User
 
 logger = getLogger(__name__)
@@ -18,12 +27,50 @@ ogrUseExceptions()
 
 pdal_filter_stats = {"type": "filters.stats", "dimensions": "X,Y"}
 
+DataFileName = NewType("DataFileName", str)
+
 
 class Drivers(Enum):
     CITYJSON = auto()
     GDAL = auto()
     OGR = auto()
     PDAL = auto()
+
+
+@dataclass(repr=True)
+class BBox:
+    """Bounding box"""
+
+    minx: float
+    miny: float
+    maxx: float
+    maxy: float
+
+    def to_ogr_geometry_wkbpolygon(self) -> Geometry:
+        """Convert to an OGR Geometry that is a wkbPolygon."""
+        ring = Geometry(wkbLinearRing)
+        ring.AddPoint_2D(self.minx, self.miny)
+        ring.AddPoint_2D(self.maxx, self.miny)
+        ring.AddPoint_2D(self.maxx, self.maxy)
+        ring.AddPoint_2D(self.minx, self.maxy)
+        ring.AddPoint_2D(self.minx, self.miny)
+        poly = Geometry(wkbPolygon)
+        poly.AddGeometry(ring)
+        return poly
+
+    def to_wkt(self) -> str:
+        """Convert to a WKT Polygon."""
+        poly = self.to_ogr_geometry_wkbpolygon()
+        return poly.ExportToWkt()
+
+
+@dataclass(repr=True)
+class BBoxSRS:
+    """Bounding box in EPSG:3857, original SRS and SRS information"""
+
+    bbox_epsg_3857: BBox | None = None
+    bbox_original_srs: BBox | None = None
+    srs_wkt: str | None = None
 
 
 @dataclass(repr=True)
@@ -38,7 +85,7 @@ class DataFile:
         description: str = None,
         changed_by: User = None,
     ):
-        self.name = path.name
+        self.name = DataFileName(path.name)
         self.license = data_license
         self.format = data_format
         self.description = description
@@ -81,10 +128,15 @@ class DataFile:
             return Drivers.PDAL, pdal_format
         raise ValueError(f"Cannot determine format of {path}")
 
-    def __compute_bbox(self, path: Path) -> tuple[float, float, float, float]:
+    def __compute_bbox(self, path: Path) -> BBoxSRS:
+        target_epsg = GEODEPOT_INDEX_EPSG
+        pseudo_mercator = SpatialReference()
+        pseudo_mercator.ImportFromEPSG(target_epsg)
         if self.driver == Drivers.CITYJSON:
             with path.open() as f:
                 cj = load(f)
+                metadata = cj.get("metadata")
+                srs = metadata.get("referenceSystem")
                 if "vertices" in cj:
                     t = cj.get(
                         "transform",
@@ -106,7 +158,27 @@ class DataFile:
                             miny = real_y
                         elif real_y > maxy:
                             maxy = real_y
-                    return minx, maxx, miny, maxy
+                    bbox_srs = BBoxSRS(bbox_original_srs=BBox(minx, maxx, miny, maxy))
+                    if srs is not None:
+                        # EPSG parsing taken from https://github.com/cityjson/cjio
+                        if "opengis.net/def/crs" not in srs or srs.rfind("/") < 0:
+                            logger.error(f"Cannot parse EPSG code from {srs} of {path}")
+                        else:
+                            epsg = int(srs[srs.rfind("/") + 1 :])
+                            srs = SpatialReference()
+                            srs.ImportFromEPSG(epsg)
+                            try:
+                                ct = CreateCoordinateTransformation(
+                                    srs, pseudo_mercator
+                                )
+                                bbox_srs.bbox_epsg_3857 = BBox(
+                                    *ct.TransformBounds(minx, maxx, miny, maxy, 21)
+                                )
+                            except Exception as e:
+                                logger.error(
+                                    f"Could not reproject the bounding box of {path} to EPSG:{target_epsg} with exception: {e}"
+                                )
+                    return bbox_srs
                 else:
                     raise ValueError(
                         f"Cannot compute bounding box for {path}, file does not contain a 'vertices' member"
@@ -116,18 +188,57 @@ class DataFile:
         elif self.driver == Drivers.OGR:
             with ogrOpen(path) as ogr_dataset:
                 lyr = ogr_dataset.GetLayer(0)
-                return lyr.GetExtent(force=True)
-                # lyr.GetSpatialRef().ExportToWkt()
+                srs = lyr.GetSpatialRef()
+                extent = lyr.GetExtent(force=True)
+                bbox_srs = BBoxSRS(
+                    bbox_original_srs=BBox(extent[0], extent[2], extent[1], extent[3])
+                )
+                if srs is not None:
+                    bbox_srs.srs_wkt = srs.ExportToWkt()
+                    try:
+                        ct = CreateCoordinateTransformation(srs, pseudo_mercator)
+                        bbox_srs.bbox_epsg_3857 = BBox(
+                            *ct.TransformBounds(
+                                extent[0], extent[2], extent[1], extent[3], 21
+                            )
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Could not reproject the bounding box of {path} to EPSG:{target_epsg} with exception: {e}"
+                        )
+                else:
+                    logger.info(
+                        f"Could not retrieve the SRS of {path} and could not reproject the BBox to EPSG:{target_epsg}. The 'file_extent_original_srs' filed contains the extent in orginal coordinates."
+                    )
+                return bbox_srs
         elif self.driver == Drivers.PDAL:
             pdal_pipeline = Pipeline(dumps([str(path), pdal_filter_stats]))
             pdal_pipeline.execute()
             stats = pdal_pipeline.metadata["metadata"]["filters.stats"]["statistic"]
-            x_max = stats[0]["maximum"]
-            x_min = stats[0]["minimum"]
-            y_max = stats[1]["maximum"]
-            y_min = stats[1]["minimum"]
-            # pdal_pipeline.srswkt2
-            return x_min, x_max, y_min, y_max
+            bbox = (
+                stats[0]["minimum"],
+                stats[1]["minimum"],
+                stats[0]["maximum"],
+                stats[1]["maximum"],
+            )
+            bbox_srs = BBoxSRS(bbox_original_srs=BBox(*bbox))
+            srs_wkt = pdal_pipeline.srswkt2
+            if srs_wkt is not None and srs_wkt != "":
+                bbox_srs.srs_wkt = srs_wkt
+                srs = SpatialReference()
+                srs.ImportFromWkt(srs_wkt)
+                try:
+                    ct = CreateCoordinateTransformation(srs, pseudo_mercator)
+                    bbox_srs.bbox_epsg_3857 = BBox(*ct.TransformBounds(*bbox, 21))
+                except Exception as e:
+                    logger.error(
+                        f"Could not reproject the bounding box of {path} to EPSG:{target_epsg} with exception: {e}"
+                    )
+            else:
+                logger.info(
+                    f"Could not retrieve the SRS of {path} and could not reproject the BBox to EPSG:{target_epsg}. The 'file_extent_original_srs' filed contains the extent in orginal coordinates."
+                )
+            return bbox_srs
         else:
             raise ValueError(f"Unknown driver: {self.driver}")
 
