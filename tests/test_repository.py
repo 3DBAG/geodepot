@@ -31,3 +31,19 @@ def test_add(mock_temp_project, mock_user_home, data_dir):
     # fishy
     repo.index.serialize(repo.path.joinpath("index.geojson"))
     print(repo)
+
+def test_load(mock_temp_project, mock_user_home, data_dir):
+    repo = Repository()
+    repo.init()
+
+    repo.add("wippolder", pathspec=str(data_dir/"wippolder.gpkg"),
+             description="wippolder case description", license="CC-0")
+    repo.add("wippolder", pathspec=str(data_dir/"wippolder.las"),
+             description="wippolder case description", license="CC-0")
+
+    # fishy
+    repo.index.serialize(repo.path.joinpath("index.geojson"))
+    print()
+    print(repo.index)
+    repo.load_index()
+    print(repo.index)

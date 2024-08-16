@@ -4,7 +4,7 @@ from hashlib import file_digest
 from json import dumps, load
 from logging import getLogger
 from pathlib import Path
-from typing import NewType
+from typing import NewType, Self
 
 from osgeo.gdal import Open as gdalOpen, UseExceptions as gdalUseExceptions
 from osgeo.ogr import (
@@ -12,7 +12,8 @@ from osgeo.ogr import (
     UseExceptions as ogrUseExceptions,
     Geometry,
     wkbPolygon,
-    wkbLinearRing,
+    wkbLinearRing, Feature,
+    CreateGeometryFromWkt
 )
 from osgeo.osr import SpatialReference, CreateCoordinateTransformation
 from pdal import Reader, Pipeline
@@ -73,9 +74,18 @@ class BBoxSRS:
     srs_wkt: str | None = None
 
 
-@dataclass(repr=True)
+@dataclass(repr=True, init=False)
 class DataFile:
     """A data file in the repository."""
+
+    name: str | None = None
+    license: str | None = None
+    format: str | None = None
+    description: str | None = None
+    changed_by: User | None = None
+    sha1: str | None = None
+    driver: Drivers | None = None
+    bbox: BBoxSRS | None = None
 
     def __init__(
         self,
@@ -241,6 +251,28 @@ class DataFile:
             return bbox_srs
         else:
             raise ValueError(f"Unknown driver: {self.driver}")
+
+    @classmethod
+    def from_ogr_feature(cls, feature: Feature) -> Self:
+        df = cls.__new__(cls)
+        df.name = DataFileName(feature["file_name"])
+        df.sha1 = feature["file_sha1"]
+        df.description = feature["file_description"]
+        df.format = feature["file_format"]
+        df.changed_by = User.from_pretty(feature["file_changed_by"])
+        df.license = feature["file_license"]
+        if (gref := feature.GetGeometryRef()) is not None:
+            extent = gref.GetEnvelope()
+            bbox = BBox(extent[0], extent[2], extent[1], extent[3])
+        else:
+            bbox = None
+        extent_original = CreateGeometryFromWkt(feature["file_extent_original_srs"]).GetEnvelope()
+        df.bbox = BBoxSRS(
+            bbox_epsg_3857=bbox,
+            bbox_original_srs=BBox(extent_original[0], extent_original[2], extent_original[1], extent_original[3]),
+            srs_wkt=feature["file_srs"]
+        )
+        return df
 
 
 def try_pdal(path: Path) -> str | None:

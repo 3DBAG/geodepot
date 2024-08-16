@@ -2,9 +2,11 @@ from dataclasses import dataclass, field
 from logging import getLogger
 from pathlib import Path
 from shutil import copy2, copytree
+from typing import Self
 
 from osgeo.ogr import (
     UseExceptions,
+    Open,
     GetDriverByName,
     FieldDefn,
     FeatureDefn,
@@ -15,6 +17,8 @@ from osgeo.ogr import (
     OGRERR_NONE,
 )
 from osgeo.osr import SpatialReference
+
+from geodepot.data_file import DataFile
 
 UseExceptions()
 
@@ -46,6 +50,9 @@ INDEX_FIELD_DEFINITIONS = (
 @dataclass(repr=True)
 class Index:
     cases: dict[CaseName, Case] = field(default_factory=dict)
+
+    def add_case(self, case):
+        self.cases[case.name] = case
 
     def serialize(self, path: Path):
         try:
@@ -99,14 +106,25 @@ class Index:
         except Exception as e:
             logger.critical(f"Failed to serialize index with exception {e}")
 
-    def add_case(self, case):
-        self.cases[case.name] = case
-
-    def to_json_str(self) -> str:
-        return "{}"
-
-    def deserialise(self):
-        raise NotImplementedError
+    @classmethod
+    def deserialise(cls, path: Path) -> Self:
+        cases_in_index = {}
+        try:
+            with GetDriverByName("GeoJSON").Open(path) as ds:
+                lyr = ds.GetLayer()
+                for feat in lyr:
+                    case_name = CaseName(feat["case_name"])
+                    case = cases_in_index.get(case_name, Case(
+                        name=CaseName(feat["case_name"]),
+                        sha1=feat["case_sha1"],
+                        description=feat["case_description"],
+                    ))
+                    df = DataFile.from_ogr_feature(feat)
+                    case.data_files.append(df)
+                    cases_in_index[case_name] = case
+        except Exception as e:
+            logger.critical(f"Failed to deserialise index with exception {e}")
+        return Index(cases=cases_in_index)
 
 
 @dataclass(repr=True)
@@ -117,6 +135,14 @@ class Repository:
     @property
     def path_cases(self):
         return self.path / "cases"
+
+    @property
+    def path_index(self):
+        return self.path / GEODEPOT_INDEX
+
+    @property
+    def path_config_local(self):
+        return self.path / GEODEPOT_CONFIG_LOCAL
 
     def init(self, url: str = None):
         if self.path.exists():
@@ -129,8 +155,8 @@ class Repository:
             self.path.mkdir()
             self.path.joinpath("cases").mkdir()
             self.index = Index()
-            self.index.serialize(self.path.joinpath(GEODEPOT_INDEX))
-            Config().write_to_file(self.path.joinpath(GEODEPOT_CONFIG_LOCAL))
+            self.index.serialize(self.path_index)
+            Config().write_to_file(self.path_config_local)
             logger.info(f"Empty geodepot repository created at {self.path}")
 
     def add(
@@ -205,6 +231,9 @@ class Repository:
                     self.path_cases.joinpath( casespec.case_name, path.name),
                     dirs_exist_ok=True,
                 )
+    def load_index(self):
+        """Load the index."""
+        self.index = Index.deserialise(self.path_index)
 
 
 def parse_pathspec(pathspec: str, as_data: bool = False) -> list[Path]:

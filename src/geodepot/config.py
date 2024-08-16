@@ -23,6 +23,12 @@ class User:
     def to_pretty(self) -> str:
         return f"{self.name} <{self.email}>"
 
+    @classmethod
+    def from_pretty(cls, pretty: str) -> Self:
+        name, e = pretty.split(" ")
+        email = e.rstrip("<").lstrip(">")
+        return cls(name, email)
+
 
 def as_user(dct: dict) -> User | dict:
     if "name" in dct and "email" in dct:
