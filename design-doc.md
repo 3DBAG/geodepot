@@ -166,13 +166,13 @@ Support adding, viewing, modifying cases.
 
 the commands that have the same name as in git, but do sth different are confusing
 
-- [config](#config)
-- [init](#init)
+- [-] [config](#config)
+- [x] [init](#init)
 - [list](#list)
 - [show](#show)
 - [get](#get)
-- [add](#add)
-- [remove](#remove)
+- [x] [add](#add)
+- [x] [remove](#remove)
 - [pull](#pull)
 - [push](#push)
 - [verify](#verify)
@@ -189,6 +189,18 @@ the commands that have the same name as in git, but do sth different are confusi
 Configure Geodepot.
 
 #### init
+
+**Synopsis**
+
+```shell
+geodepot init [url]
+```
+
+**Description**
+
+Initialise a geodepot repository in the current directory.
+
+**Options**
 
 Without arguments, initialise an empty local repository in the current directory.
 
@@ -235,7 +247,7 @@ Can be passed multiple times.
 Only local files are supported.
 
 `-y`: 
-Do not require confirmation for upating existing values or files.
+Do not require confirmation for updating existing values or files.
 
 `--license=<text>`: 
 A license to add to the data.
@@ -276,7 +288,27 @@ geodepot add --description "new description of the case" case-name
 
 #### remove
 
-Deletes a single case from the repository.
+**Synopsis**
+
+```shell
+geodepot remove [-y] [<casespec>...]
+```
+
+**Description**
+
+Delete a case or a data entry from the repository.
+
+**Options**
+
+`<casespec>`:
+Case (and data) specifier, in the form of `case-name[/data-name]`.
+Can be specified multiple times.
+Providing the case name `case-name` is mandatory, the data name `data-name` within the case is optional.
+The rest of the options will affect the specified level, either the whole case with `case-name`, or just a single data within the case with `case-name/data-name`.
+For example, `wippolder/wippolder.gpkg`, where `wippolder` is the case name, `wippolder.gpkg` is the data name.
+
+`-y`: 
+Do not require confirmation for deleting the entries.
 
 #### pull
 

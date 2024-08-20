@@ -14,6 +14,40 @@ def mock_temp_project(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "cwd", mockreturn)
 
 
+@pytest.fixture(scope="function")
+def repo(mock_temp_project, mock_user_home):
+    repo = Repository()
+    repo.init()
+    return repo
+
+
+def test_remove_case(repo, wippolder_dir):
+    """Can we remove a case?"""
+    repo.add(
+        "wippolder",
+        pathspec=str(wippolder_dir / "wippolder.gpkg"),
+        description="wippolder case description",
+        license="CC-0",
+    )
+    repo.remove(CaseSpec("wippolder"))
+    assert repo.path_cases.joinpath("wippolder").exists() is False
+    assert repo.get_case(CaseSpec("wippolder")) is None
+
+
+def test_remove_data(repo, wippolder_dir):
+    """Can we remove a data entry?"""
+    repo.add(
+        "wippolder",
+        pathspec=str(wippolder_dir / "wippolder.gpkg"),
+        description="wippolder case description",
+        license="CC-0",
+    )
+    casespec = CaseSpec("wippolder", "wippolder.gpkg")
+    repo.remove(casespec)
+    assert repo.path_cases.joinpath(casespec.as_path()).exists() is False
+    assert repo.get_data_file(casespec) is None
+
+
 def test_empty(mock_temp_project):
     """Can we create an empty repository?"""
     repo = Repository()
@@ -21,10 +55,8 @@ def test_empty(mock_temp_project):
     print(repo)
 
 
-def test_index_serialize(mock_temp_project, mock_user_home, wippolder_dir):
+def test_index_serialize(repo, wippolder_dir):
     """Can we serialize the index?"""
-    repo = Repository()
-    repo.init()
     repo.add(
         "wippolder",
         pathspec=str(wippolder_dir / "wippolder.gpkg"),

@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from logging import getLogger
 from pathlib import Path
-from shutil import copy2, copytree
+from shutil import copy2, copytree, rmtree
 from typing import Self
 
 from osgeo.ogr import (
@@ -35,6 +35,9 @@ class Index:
 
     def add_case(self, case: Case):
         self.cases[case.name] = case
+
+    def remove_case(self, case_name: CaseName) -> Case | None:
+        return self.cases.pop(case_name, None)
 
     def serialize(self, path: Path):
         try:
@@ -160,6 +163,10 @@ class Repository:
             Config().write_to_file(self.path_config_local)
             logger.info(f"Empty geodepot repository created at {self.path}")
 
+    def load_index(self):
+        """Load the index."""
+        self.index = Index.deserialize(self.path_index)
+
     def add(
         self,
         casespec: str,
@@ -269,9 +276,35 @@ class Repository:
                     dirs_exist_ok=True,
                 )
 
-    def load_index(self):
-        """Load the index."""
-        self.index = Index.deserialize(self.path_index)
+    def remove(self, casespec: CaseSpec):
+        """Remove an entry from the repository."""
+        if casespec.data_file_name is None:
+            # Remove the whole case
+            if (
+                case := self.index.remove_case(case_name=casespec.case_name)
+            ) is not None:
+                rmtree(self.path_cases.joinpath(casespec.as_path()))
+                logger.info(f"Removed {case.name} from the repository")
+            else:
+                logger.info(f"The case {casespec} does not exist in the repository")
+        else:
+            if (case := self.get_case(casespec)) is not None:
+                df = case.remove_data_file(casespec.data_file_name)
+                if df is not None:
+                    if (p := self.path_cases.joinpath(casespec.as_path())).is_dir():
+                        p.rmdir()
+                    else:
+                        p.unlink(missing_ok=False)
+                        # TODO: I could remove the whole case if there are no more files. Don't forget to remove the case from the index too.
+                    logger.info(f"Removed {df.name} from the repository")
+                else:
+                    logger.info(
+                        f"The data entry {casespec} does not exist in the repository"
+                    )
+            else:
+                logger.info(
+                    f"The case {casespec.case_name} does not exist in the repository"
+                )
 
 
 def parse_pathspec(pathspec: str, as_data: bool = False) -> list[Path]:

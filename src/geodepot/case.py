@@ -20,6 +20,14 @@ class CaseSpec:
         """Parse the case specifier."""
         return CaseSpec(*casespec.split("/"))
 
+    def as_path(self) -> Path:
+        if self.case_name is not None and self.data_file_name is not None:
+            return Path(self.case_name, self.data_file_name)
+        elif self.case_name is not None:
+            return Path(self.case_name)
+        else:
+            Path()
+
 
 @dataclass(repr=True)
 class Case:
@@ -43,11 +51,13 @@ class Case:
         return df
 
     def add_data_file(self, data_file):
-        # todo: need to move the data file to the case dir
         self.data_files[data_file.name] = data_file
 
     def get_data_file(self, name: DataFileName) -> DataFile | None:
         return self.data_files.get(name)
+
+    def remove_data_file(self, name: DataFileName) -> DataFile | None:
+        return self.data_files.pop(name, None)
 
     def compress(self):
         raise NotImplementedError
