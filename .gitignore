@@ -4,6 +4,8 @@
 
 # Build dirs
 /src/geodepot.egg-info/
+/src/geodepot/__pycache__
+/tests/__pycache__
 
 /experiments/pyinstaller/geodepot.spec
 /experiments/pyinstaller/build/
@@ -11,11 +13,10 @@
 /experiments/pyinstaller/cli.build/
 /experiments/pyinstaller/cli.dist/
 
-
 /experiments/vcpkg/build/
 /experiments/vcpkg/vcpkg/
 /experiments/vcpkg/.idea
 /experiments/vcpkg/.run
 
 # Data
-#/tests/data/proj.db
+/tests/data/
