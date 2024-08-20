@@ -18,4 +18,4 @@
 /experiments/vcpkg/.run
 
 # Data
-/tests/data/proj.db
+#/tests/data/proj.db
