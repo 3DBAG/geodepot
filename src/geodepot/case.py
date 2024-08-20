@@ -26,14 +26,14 @@ class Case:
     name: CaseName
     description: str | None
     sha1: str | None = None
-    data_files: list[DataFile] = field(default_factory=list)
-    # todo: need to create case directory if not exists
+    data_files: dict[DataFileName, DataFile] = field(default_factory=dict)
 
-    def add_path(self, source_path: Path, data_license: str = None,
-                 format: str = None, description: str = None,
-                 changed_by: User = None) -> DataFile:
+    def add_from_path(self, source_path: Path, casespec: CaseSpec = None,
+                      data_license: str = None, format: str = None,
+                      description: str = None, changed_by: User = None) -> DataFile:
         df = DataFile(
             source_path,
+            data_name=casespec.data_file_name if casespec is not None else None,
             data_license=data_license,
             data_format=format,
             description=description,
@@ -44,7 +44,10 @@ class Case:
 
     def add_data_file(self, data_file):
         # todo: need to move the data file to the case dir
-        self.data_files.append(data_file)
+        self.data_files[data_file.name] = data_file
+
+    def get_data_file(self, name: DataFileName) -> DataFile | None:
+        return self.data_files.get(name)
 
     def compress(self):
         raise NotImplementedError

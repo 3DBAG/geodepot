@@ -540,7 +540,6 @@ git lfs could be sth to use, but maybe overkill because need to set up and opera
 ## TODOs
 
 - Try building wheels for the deps, so that geodepot is pip-installable
-- Get bbox of rasters
 - Read license from a file
 - Optimizations:
   - ~~import only the used functions~~

@@ -6,7 +6,6 @@ from typing import Self
 
 from osgeo.ogr import (
     UseExceptions,
-    Open,
     GetDriverByName,
     FieldDefn,
     FeatureDefn,
@@ -28,34 +27,33 @@ from geodepot.config import Config, get_current_user
 
 logger = getLogger(__name__)
 
-INDEX_SRS = SpatialReference()
-INDEX_SRS.ImportFromEPSG(GEODEPOT_INDEX_EPSG)
-INDEX_FIELD_DEFINITIONS = (
-    FieldDefn("fid", OFTInteger64),
-    FieldDefn("case_name", OFTString),
-    FieldDefn("case_sha1", OFTString),
-    FieldDefn("case_description", OFTString),
-    FieldDefn("file_name", OFTString),
-    FieldDefn("file_sha1", OFTString),
-    FieldDefn("file_description", OFTString),
-    FieldDefn("file_format", OFTString),
-    FieldDefn("file_changed_by", OFTString),
-    FieldDefn("file_license", OFTString),
-    FieldDefn("file_srs", OFTString),
-    FieldDefn("file_extent_original_srs", OFTString),
-)
-
 
 # to update index: https://pcjericks.github.io/py-gdalogr-cookbook/vector_layers.html#load-data-to-memory
 @dataclass(repr=True)
 class Index:
     cases: dict[CaseName, Case] = field(default_factory=dict)
 
-    def add_case(self, case):
+    def add_case(self, case: Case):
         self.cases[case.name] = case
 
     def serialize(self, path: Path):
         try:
+            INDEX_SRS = SpatialReference()
+            INDEX_SRS.ImportFromEPSG(GEODEPOT_INDEX_EPSG)
+            INDEX_FIELD_DEFINITIONS = (
+                FieldDefn("fid", OFTInteger64),
+                FieldDefn("case_name", OFTString),
+                FieldDefn("case_sha1", OFTString),
+                FieldDefn("case_description", OFTString),
+                FieldDefn("file_name", OFTString),
+                FieldDefn("file_sha1", OFTString),
+                FieldDefn("file_description", OFTString),
+                FieldDefn("file_format", OFTString),
+                FieldDefn("file_changed_by", OFTString),
+                FieldDefn("file_license", OFTString),
+                FieldDefn("file_srs", OFTString),
+                FieldDefn("file_extent_original_srs", OFTString),
+            )
             fid = 0
             # We simple write a new index on serialization
             if path.exists():
@@ -74,7 +72,7 @@ class Index:
                     defn.AddFieldDefn(fdef)
 
                 for case_name, case in self.cases.items():
-                    for data in case.data_files:
+                    for data in case.data_files.values():
                         feat = Feature(defn)
                         feat["fid"] = fid
                         feat["case_name"] = case_name
@@ -107,23 +105,26 @@ class Index:
             logger.critical(f"Failed to serialize index with exception {e}")
 
     @classmethod
-    def deserialise(cls, path: Path) -> Self:
+    def deserialize(cls, path: Path) -> Self:
         cases_in_index = {}
         try:
             with GetDriverByName("GeoJSON").Open(path) as ds:
                 lyr = ds.GetLayer()
                 for feat in lyr:
                     case_name = CaseName(feat["case_name"])
-                    case = cases_in_index.get(case_name, Case(
-                        name=CaseName(feat["case_name"]),
-                        sha1=feat["case_sha1"],
-                        description=feat["case_description"],
-                    ))
+                    case = cases_in_index.get(
+                        case_name,
+                        Case(
+                            name=CaseName(feat["case_name"]),
+                            sha1=feat["case_sha1"],
+                            description=feat["case_description"],
+                        ),
+                    )
                     df = DataFile.from_ogr_feature(feat)
-                    case.data_files.append(df)
+                    case.add_data_file(df)
                     cases_in_index[case_name] = case
         except Exception as e:
-            logger.critical(f"Failed to deserialise index with exception {e}")
+            logger.critical(f"Failed to deserialize index with exception {e}")
         return Index(cases=cases_in_index)
 
 
@@ -161,11 +162,11 @@ class Repository:
 
     def add(
         self,
-        casespec,
-        pathspec: str = None,
-        description: str = None,
-        license: str = None,
-        format: str = None,
+        casespec: str,
+        pathspec: str | None = None,
+        description: str | None = None,
+        license: str | None = None,
+        format: str | None = None,
         as_data: bool = False,
         yes: bool = True,
     ):
@@ -180,30 +181,62 @@ class Repository:
         else:
             case_description = description
         # Get an existing case or create an new if not exists
-        case = self.get_case(casespec)
+        if (case := self.get_case(casespec)) is None:
+            case = self.init_case(casespec)
         # Update the description of an existing case
         if case_description is not None:
             case.description = case_description
-        # Add/Update the specified data to the case
-        data_paths = parse_pathspec(pathspec, as_data=as_data)
-        for p in data_paths:
-            df = case.add_path(
-                p,
-                data_license=license,
-                format=format,
-                description=data_description,
-                changed_by=get_current_user(),
-            )
-            self.copy_data(p, casespec)
-            logger.info(f"Added {df.name} to {case.name}")
+        if pathspec is None:
+            # Only update the license or description or format
+            if case_description is not None:
+                case.description = case_description
+                logger.info(f"Updated the description on the case {case.name}")
+            if (df := self.get_data_file(casespec)) is not None:
+                if data_description is not None:
+                    df.description = data_description
+                    logger.info(f"Updated the description on the data entry {casespec}")
+                if license is not None:
+                    df.license = license
+                    logger.info(f"Updated the license on the data entry {casespec}")
+                if format is not None:
+                    df.format = format
+                    logger.info(f"Updated the format on the data entry {casespec}")
+            else:
+                logger.error(
+                    f"The case/data {casespec} does not exist in the repository"
+                )
+                return None
+        else:
+            # Add/Update the specified data to the case
+            data_paths = parse_pathspec(pathspec, as_data=as_data)
+            for p in data_paths:
+                df = case.add_from_path(
+                    p,
+                    casespec=casespec,
+                    data_license=license,
+                    format=format,
+                    description=data_description,
+                    changed_by=get_current_user(),
+                )
+                self.copy_data(p, casespec)
+                logger.info(f"Added {df.name} to {case.name}")
         self.index.cases[casespec.case_name] = case
 
-    def get_case(self, casespec: CaseSpec) -> Case:
-        """Retrive an existing case or initialize a new one."""
-        if (case := self.index.cases.get(casespec.case_name)) is None:
-            case = Case(name=casespec.case_name, description=None)
-            self.path_cases.joinpath( casespec.case_name).mkdir()
-        return case
+    def get_case(self, casespec: CaseSpec) -> Case | None:
+        """Retrive an existing case."""
+        return self.index.cases.get(casespec.case_name)
+
+    def init_case(self, casespec: CaseSpec) -> Case:
+        """Create a new case an return it."""
+        case = Case(name=casespec.case_name, description=None)
+        self.index.add_case(case)
+        self.path_cases.joinpath(casespec.case_name).mkdir()
+        return self.get_case(casespec)
+
+    def get_data_file(self, casespec: CaseSpec) -> DataFile | None:
+        """Retrive an existing data entry.
+        Return None if the data entry does not exist."""
+        return self.get_case(casespec).get_data_file(casespec.data_file_name)
 
     def copy_data(self, path: Path, casespec: CaseSpec):
         """Copies a data entry into the repository."""
@@ -212,28 +245,33 @@ class Repository:
                 # Rename the file when copied into the case
                 copy2(
                     path,
-                    self.path_cases.joinpath( casespec.case_name, casespec.data_file_name),
+                    self.path_cases.joinpath(
+                        casespec.case_name, casespec.data_file_name
+                    ),
                 )
             else:
                 # Keep the file name
-                copy2(path, self.path_cases.joinpath( casespec.case_name, path.name))
+                copy2(path, self.path_cases.joinpath(casespec.case_name, path.name))
         else:
             if casespec.data_file_name is not None:
                 # Copying a directory as a single data entry under a new name
                 copytree(
                     path,
-                    self.path_cases.joinpath( casespec.case_name, casespec.data_file_name),
+                    self.path_cases.joinpath(
+                        casespec.case_name, casespec.data_file_name
+                    ),
                     dirs_exist_ok=True,
                 )
             else:
                 copytree(
                     path,
-                    self.path_cases.joinpath( casespec.case_name, path.name),
+                    self.path_cases.joinpath(casespec.case_name, path.name),
                     dirs_exist_ok=True,
                 )
+
     def load_index(self):
         """Load the index."""
-        self.index = Index.deserialise(self.path_index)
+        self.index = Index.deserialize(self.path_index)
 
 
 def parse_pathspec(pathspec: str, as_data: bool = False) -> list[Path]:

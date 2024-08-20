@@ -6,14 +6,15 @@ from logging import getLogger
 from pathlib import Path
 from typing import NewType, Self
 
-from osgeo.gdal import Open as gdalOpen, UseExceptions as gdalUseExceptions
+from osgeo.gdal import OpenEx as gdalOpenEx, UseExceptions as gdalUseExceptions
 from osgeo.ogr import (
     Open as ogrOpen,
     UseExceptions as ogrUseExceptions,
     Geometry,
     wkbPolygon,
-    wkbLinearRing, Feature,
-    CreateGeometryFromWkt
+    wkbLinearRing,
+    Feature,
+    CreateGeometryFromWkt,
 )
 from osgeo.osr import SpatialReference, CreateCoordinateTransformation
 from pdal import Reader, Pipeline
@@ -94,8 +95,11 @@ class DataFile:
         data_format: str = None,
         description: str = None,
         changed_by: User = None,
+        data_name: str | DataFileName = None,
     ):
-        self.name = DataFileName(path.name)
+        self.name = (
+            DataFileName(data_name) if data_name is not None else DataFileName(path.name)
+        )
         self.license = data_license
         self.format = data_format
         self.description = description
@@ -194,7 +198,41 @@ class DataFile:
                         f"Cannot compute bounding box for {path}, file does not contain a 'vertices' member"
                     )
         elif self.driver == Drivers.GDAL:
-            raise NotImplementedError
+            with gdalOpenEx(path) as gdal_dataset:
+                bbox_srs = BBoxSRS()
+                srs = gdal_dataset.GetSpatialRef()
+                geotransform = gdal_dataset.GetGeoTransform(can_return_null=True)
+                if geotransform is not None:
+                    xmin = geotransform[0]
+                    ymax = geotransform[3]
+                    xsize = gdal_dataset.RasterXSize
+                    ysize = gdal_dataset.RasterYSize
+                    xres = abs(geotransform[1])
+                    yres = abs(geotransform[5])
+                    extent = (xmin, ymax - (ysize * yres), xmin + (xsize * xres), ymax)
+                    bbox_srs.bbox_original_srs = BBox(
+                        extent[0], extent[1], extent[2], extent[3]
+                    )
+                else:
+                    logger.info(f"Could not find the affine transformation parameters of {path} and could not calculate its extent.")
+                if srs is not None and geotransform is not None:
+                    bbox_srs.srs_wkt = srs.ExportToWkt()
+                    try:
+                        ct = CreateCoordinateTransformation(srs, pseudo_mercator)
+                        bbox_srs.bbox_epsg_3857 = BBox(
+                            *ct.TransformBounds(
+                                extent[0], extent[1], extent[2], extent[3], 21
+                            )
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Could not reproject the bounding box of {path} to EPSG:{target_epsg} with exception: {e}"
+                        )
+                else:
+                    logger.info(
+                        f"Could not retrieve the SRS of {path} and could not reproject the BBox to EPSG:{target_epsg}. The 'file_extent_original_srs' field contains the extent in original coordinates."
+                    )
+                return bbox_srs
         elif self.driver == Drivers.OGR:
             with ogrOpen(path) as ogr_dataset:
                 lyr = ogr_dataset.GetLayer(0)
@@ -218,7 +256,7 @@ class DataFile:
                         )
                 else:
                     logger.info(
-                        f"Could not retrieve the SRS of {path} and could not reproject the BBox to EPSG:{target_epsg}. The 'file_extent_original_srs' filed contains the extent in orginal coordinates."
+                        f"Could not retrieve the SRS of {path} and could not reproject the BBox to EPSG:{target_epsg}. The 'file_extent_original_srs' field contains the extent in original coordinates."
                     )
                 return bbox_srs
         elif self.driver == Drivers.PDAL:
@@ -246,7 +284,7 @@ class DataFile:
                     )
             else:
                 logger.info(
-                    f"Could not retrieve the SRS of {path} and could not reproject the BBox to EPSG:{target_epsg}. The 'file_extent_original_srs' filed contains the extent in orginal coordinates."
+                    f"Could not retrieve the SRS of {path} and could not reproject the BBox to EPSG:{target_epsg}. The 'file_extent_original_srs' field contains the extent in original coordinates."
                 )
             return bbox_srs
         else:
@@ -266,11 +304,18 @@ class DataFile:
             bbox = BBox(extent[0], extent[2], extent[1], extent[3])
         else:
             bbox = None
-        extent_original = CreateGeometryFromWkt(feature["file_extent_original_srs"]).GetEnvelope()
+        extent_original = CreateGeometryFromWkt(
+            feature["file_extent_original_srs"]
+        ).GetEnvelope()
         df.bbox = BBoxSRS(
             bbox_epsg_3857=bbox,
-            bbox_original_srs=BBox(extent_original[0], extent_original[2], extent_original[1], extent_original[3]),
-            srs_wkt=feature["file_srs"]
+            bbox_original_srs=BBox(
+                extent_original[0],
+                extent_original[2],
+                extent_original[1],
+                extent_original[3],
+            ),
+            srs_wkt=feature["file_srs"],
         )
         return df
 
@@ -296,8 +341,9 @@ def try_ogr(path: Path) -> str | None:
 
 def try_gdal(path: Path) -> str | None:
     try:
-        with gdalOpen(path) as gdal_dataset:
-            return gdal_dataset.GetDriver().GetName()
+        with gdalOpenEx(path) as gdal_dataset:
+            lname = gdal_dataset.GetDriver().LongName
+            return lname if lname is not None else gdal_dataset.GetDriver().ShortName
     except RuntimeError:
         return None
 

@@ -25,8 +25,9 @@ class User:
 
     @classmethod
     def from_pretty(cls, pretty: str) -> Self:
-        name, e = pretty.split(" ")
-        email = e.rstrip("<").lstrip(">")
+        name, e = pretty.split("<")
+        name = name.strip()
+        email = e.rstrip(">").strip()
         return cls(name, email)
 
 

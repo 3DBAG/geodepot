@@ -74,3 +74,8 @@ def test_write_config(mock_user_home, tmp_path):
     assert config_new == config_new_from_file
     # Restore the original version
     config_original.write_to_file(get_global_config_path())
+
+def test_user_from_pretty():
+    user = User.from_pretty("Kovács János <janos@kovacs.me>")
+    assert user.name == "Kovács János"
+    assert user.email == "janos@kovacs.me"

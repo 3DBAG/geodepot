@@ -7,6 +7,10 @@ import pytest
 def data_dir():
     return Path(__file__).parent / 'data'
 
+@pytest.fixture(scope='session')
+def wippolder_dir(data_dir):
+    return data_dir / 'wippolder'
+
 @pytest.fixture(scope='function')
 def mock_user_home(monkeypatch, data_dir):
     def mockreturn():
