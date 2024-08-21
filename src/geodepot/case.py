@@ -50,10 +50,11 @@ class Case:
         self.add_data_file(df)
         return df
 
-    def add_data_file(self, data_file):
+    def add_data_file(self, data_file: DataFile):
         self.data_files[data_file.name] = data_file
 
     def get_data_file(self, name: DataFileName) -> DataFile | None:
+        # TODO: maybe this should take a CaseSpec as argument instead of just a DataFileName
         return self.data_files.get(name)
 
     def remove_data_file(self, name: DataFileName) -> DataFile | None:

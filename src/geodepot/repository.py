@@ -167,6 +167,10 @@ class Repository:
         """Load the index."""
         self.index = Index.deserialize(self.path_index)
 
+    def write_index(self):
+        """Serialize the index."""
+        self.index.serialize(self.path_index)
+
     def add(
         self,
         casespec: str,
@@ -177,6 +181,7 @@ class Repository:
         as_data: bool = False,
         yes: bool = True,
     ):
+        self.load_index()
         casespec = CaseSpec.from_str(casespec)
         if not yes:
             raise NotImplementedError
@@ -227,10 +232,12 @@ class Repository:
                 )
                 self.copy_data(p, casespec)
                 logger.info(f"Added {df.name} to {case.name}")
-        self.index.cases[casespec.case_name] = case
+        self.index.add_case(case)
+        self.write_index()
+        logger.debug(f"Serialized the index to {self.path_index}")
 
     def get_case(self, casespec: CaseSpec) -> Case | None:
-        """Retrive an existing case."""
+        """Retrieve an existing case."""
         return self.index.cases.get(casespec.case_name)
 
     def init_case(self, casespec: CaseSpec) -> Case:
@@ -241,9 +248,20 @@ class Repository:
         return self.get_case(casespec)
 
     def get_data_file(self, casespec: CaseSpec) -> DataFile | None:
-        """Retrive an existing data entry.
+        """Retrieve an existing data entry.
         Return None if the data entry does not exist."""
-        return self.get_case(casespec).get_data_file(casespec.data_file_name)
+        if (case := self.get_case(casespec)) is not None:
+            if casespec.data_file_name is not None:
+                return case.get_data_file(casespec.data_file_name)
+        logger.info(f"The entry {casespec} does not exist in the repository.")
+        return None
+
+    def get_data_path(self, casespec: CaseSpec) -> Path | None:
+        """Retrieve the full path to an existing data entry."""
+        if (_ := self.get_data_file(casespec)) is not None:
+            return self.path_cases.joinpath(casespec.as_path())
+        logger.info(f"The entry {casespec} does not exist in the repository.")
+        return None
 
     def copy_data(self, path: Path, casespec: CaseSpec):
         """Copies a data entry into the repository."""

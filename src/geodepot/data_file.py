@@ -79,7 +79,7 @@ class BBoxSRS:
 class DataFile:
     """A data file in the repository."""
 
-    name: str | None = None
+    name: DataFileName | None = None
     license: str | None = None
     format: str | None = None
     description: str | None = None

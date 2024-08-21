@@ -170,7 +170,7 @@ the commands that have the same name as in git, but do sth different are confusi
 - [x] [init](#init)
 - [list](#list)
 - [show](#show)
-- [get](#get)
+- [x] [get](#get)
 - [x] [add](#add)
 - [x] [remove](#remove)
 - [pull](#pull)
@@ -215,9 +215,23 @@ List the cases in the repository.
 
 Show the details of the specified case.
 
-#### get <case-id> <filename>
+#### get
 
-Return the full path to the specified data file of the specified case.
+**Synopsis**
+
+```shell
+geodepot get <casespec>
+```
+
+**Description**
+
+Return the full path to the specified data entry of the specified case.
+
+**Options**
+
+`<casespec>`:
+Case (and data) specifier, in the form of `case-name/data-name`.
+For example, `wippolder/wippolder.gpkg`, where `wippolder` is the case name, `wippolder.gpkg` is the data name.
 
 #### add
 
