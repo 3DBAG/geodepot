@@ -1,8 +1,9 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
+from enum import Enum, auto
 from logging import getLogger
 from pathlib import Path
 from shutil import copy2, copytree, rmtree
-from typing import Self
+from typing import Self, Any
 
 from osgeo.ogr import (
     UseExceptions,
@@ -17,19 +18,48 @@ from osgeo.ogr import (
 )
 from osgeo.osr import SpatialReference
 
+from geodepot import GEODEPOT_CONFIG_LOCAL, GEODEPOT_INDEX, GEODEPOT_INDEX_EPSG
+from geodepot.case import CaseName, Case, CaseSpec
+from geodepot.config import Config, get_current_user, User
 from geodepot.data_file import DataFile
 
 UseExceptions()
-
-from geodepot import GEODEPOT_CONFIG_LOCAL, GEODEPOT_INDEX, GEODEPOT_INDEX_EPSG
-from geodepot.case import CaseName, Case, CaseSpec
-from geodepot.config import Config, get_current_user
-
 logger = getLogger(__name__)
 
 
+class Status(Enum):
+    ADD = auto()
+    DELETE = auto()
+    MODIFY = auto()
+
+
+@dataclass(repr=True, order=True)
+class IndexDiff:
+    status: Status
+    changed_by_other: User
+    casespec_self: CaseSpec | None = None
+    casespec_other: CaseSpec | None = None
+    member: str | None = None
+    value_self: Any = None
+    value_other: Any = None
+
+
+def create_modified_diff(
+    casespec: CaseSpec, df_self: DataFile, df_other: DataFile, member: str
+) -> IndexDiff:
+    return IndexDiff(
+        casespec_self=casespec,
+        casespec_other=casespec,
+        status=Status.MODIFY,
+        changed_by_other=df_other.changed_by,
+        value_self=df_self.__getattribute__(member),
+        value_other=df_other.__getattribute__(member),
+        member=member,
+    )
+
+
 # to update index: https://pcjericks.github.io/py-gdalogr-cookbook/vector_layers.html#load-data-to-memory
-@dataclass(repr=True)
+@dataclass(repr=True, order=True)
 class Index:
     cases: dict[CaseName, Case] = field(default_factory=dict)
 
@@ -108,7 +138,10 @@ class Index:
             logger.critical(f"Failed to serialize index with exception {e}")
 
     @classmethod
-    def deserialize(cls, path: Path) -> Self:
+    def deserialize(cls, path: Path) -> Self | None:
+        if not path.exists():
+            logger.critical(f"Index path {path} does not exist")
+            return None
         cases_in_index = {}
         try:
             with GetDriverByName("GeoJSON").Open(path) as ds:
@@ -128,8 +161,91 @@ class Index:
                     cases_in_index[case_name] = case
         except Exception as e:
             logger.critical(f"Failed to deserialize index with exception {e}")
+            return None
         return Index(cases=cases_in_index)
 
+    def diff(self, other: Self) -> list[IndexDiff]:
+        """Compare two indices and return the difference."""
+        diff_all = []
+        if len(self.cases) == 0 and len(other.cases) == 0:
+            return diff_all
+        # Compare the cases that exist in both
+        for case_name, case_self in self.cases.items():
+            if (case_other := other.cases.get(case_name, None)) is not None:
+                for df_name, df_self in case_self.data_files.items():
+                    casespec = CaseSpec(case_name=case_name, data_file_name=df_name)
+                    df_other = case_other.data_files.get(df_name, None)
+                    if df_other is not None:
+                        for member in fields(DataFile):
+                            if member.name not in ("name", "changed_by"):
+                                value_self = getattr(df_self, member.name)
+                                value_other = getattr(df_other, member.name)
+                                if value_self != value_other:
+                                    diff_all.append(
+                                        IndexDiff(
+                                            casespec_self=casespec,
+                                            casespec_other=casespec,
+                                            status=Status.MODIFY,
+                                            changed_by_other=df_other.changed_by,
+                                            value_self=value_self,
+                                            value_other=value_other,
+                                            member=member.name,
+                                        )
+                                    )
+                    else:
+                        deleted = True  # TODO check deletions file of remote
+                        changed_by = (
+                            User("", "") if deleted else df_self.changed_by
+                        )  # TODO deletions file of remote
+                        diff_all.append(
+                            IndexDiff(
+                                casespec_self=casespec,
+                                casespec_other=None,
+                                status=Status.DELETE if deleted else Status.ADD,
+                                changed_by_other=changed_by,
+                            )
+                        )
+                diff_other_data = set(case_other.data_files.keys()).difference(
+                    set(case_self.data_files.keys())
+                )
+                for df_name in diff_other_data:
+                    deleted = True  # TODO check deletions file of local
+                    remote_user = User("", "")
+                    changed_by = get_current_user() if deleted else remote_user # TODO deletions file of local
+                    diff_all.append(
+                        IndexDiff(
+                            casespec_self=None,
+                            casespec_other=CaseSpec(case_name, df_name),
+                            status=Status.DELETE if deleted else Status.ADD,
+                            changed_by_other=changed_by,
+                        )
+                    )
+            else:
+                deleted = True  # TODO check deletions file of remote
+                remote_user = User("", "")
+                changed_by = remote_user if deleted else get_current_user()  # TODO deletions file of remote
+                diff_all.append(
+                    IndexDiff(
+                        casespec_self=CaseSpec(case_name=case_name),
+                        casespec_other=None,
+                        status=Status.DELETE if deleted else Status.ADD,
+                        changed_by_other=changed_by,
+                    )
+                )
+        diff_other_cases = set(other.cases.keys()).difference(set(self.cases.keys()))
+        for case_name in diff_other_cases:
+            deleted = True  # TODO check deletions file of local
+            remote_user = User("", "")
+            changed_by = get_current_user if deleted else remote_user  # TODO deletions file of local
+            diff_all.append(
+                IndexDiff(
+                    casespec_self=None,
+                    casespec_other=CaseSpec(case_name=case_name),
+                    status=Status.DELETE if deleted else Status.ADD,
+                    changed_by_other=changed_by,
+                )
+            )
+        return diff_all
 
 @dataclass(repr=True)
 class Repository:

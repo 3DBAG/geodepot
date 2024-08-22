@@ -154,7 +154,9 @@ def get_config() -> Config:
     config = get_global_config()
     local_config = get_local_config()
     if config is None and local_config is None:
-        logger.error("Could not load the global nor a local configuration, using an empty config")
+        logger.error(
+            "Could not load the global nor a local configuration, using an empty config"
+        )
         return Config()
     config = config if config is not None else Config()
     local_config = local_config if local_config is not None else Config()

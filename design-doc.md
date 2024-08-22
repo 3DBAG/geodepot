@@ -585,6 +585,12 @@ git lfs could be sth to use, but maybe overkill because need to set up and opera
 
 ## TODOs
 
+- Check again that driver detection works
+- Test with adding `pickle`
+- Add option for providing bbox to `add`
+- How to record the changing User when only the case description
+- Add driver to index
+- Find out diver from format
 - Try building wheels for the deps, so that geodepot is pip-installable
 - Read license from a file
 - Optimizations:

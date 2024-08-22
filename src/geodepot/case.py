@@ -29,7 +29,7 @@ class CaseSpec:
             Path()
 
 
-@dataclass(repr=True)
+@dataclass(repr=True, order=True)
 class Case:
     name: CaseName
     description: str | None
@@ -39,14 +39,9 @@ class Case:
     def add_from_path(self, source_path: Path, casespec: CaseSpec = None,
                       data_license: str = None, format: str = None,
                       description: str = None, changed_by: User = None) -> DataFile:
-        df = DataFile(
-            source_path,
-            data_name=casespec.data_file_name if casespec is not None else None,
-            data_license=data_license,
-            data_format=format,
-            description=description,
-            changed_by=changed_by,
-        )
+        df = DataFile(source_path, data_license=data_license, data_format=format,
+                      description=description, changed_by=changed_by,
+                      data_name=casespec.data_file_name if casespec is not None else None)
         self.add_data_file(df)
         return df
 

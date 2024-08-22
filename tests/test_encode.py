@@ -1,4 +1,5 @@
 import json
+
 from geodepot.config import Config, User
 from geodepot.encode import *
 

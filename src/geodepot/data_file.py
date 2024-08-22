@@ -75,7 +75,7 @@ class BBoxSRS:
     srs_wkt: str | None = None
 
 
-@dataclass(repr=True, init=False)
+@dataclass(repr=True, init=False, order=True)
 class DataFile:
     """A data file in the repository."""
 
