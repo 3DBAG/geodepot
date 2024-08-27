@@ -29,9 +29,10 @@ def user_remote() -> User:
     return User(name="Remote User", email="remote@user.me")
 
 @pytest.fixture(scope="function")
-def case_wippolder() -> Case:
+def case_wippolder(user_local) -> Case:
     return Case(
-        name=CaseName("wippolder"), description=None, sha1=None, data=dict()
+        name=CaseName("wippolder"), description=None, sha1=None, data=dict(),
+        changed_by=user_local
     )
 
 
@@ -106,24 +107,20 @@ def data_wippolder_las(user_local) -> Data:
 
 
 def test_add_case(case_wippolder, user_local, user_remote):
-    """Can we report that a new case was added?"""
+    """Can we report that a new case was added by the remote?"""
     # Added by remote
     case_remote = deepcopy(case_wippolder)
+    case_remote.changed_by = user_remote
     index_local = Index()
     (index_remote := Index()).add_case(case_remote)
     diff_all = index_local.diff(index_remote)
     assert len(diff_all) == 1
     assert diff_all[0].status == Status.ADD
     assert diff_all[0].changed_by_other == user_remote
-    # Added by local
-    diff_all = index_remote.diff(index_local)
-    assert len(diff_all) == 1
-    assert diff_all[0].status == Status.ADD
-    assert diff_all[0].changed_by_other == user_local
 
 
 def test_delete_case(case_wippolder, user_local, user_remote):
-    """Can we report that a case was deleted?"""
+    """Can we report that a case was deleted by the remote?"""
     # Deleted by remote
     case_local = deepcopy(case_wippolder)
     (index_local := Index()).add_case(case_local)
@@ -131,29 +128,15 @@ def test_delete_case(case_wippolder, user_local, user_remote):
     diff_all = index_local.diff(index_remote)
     assert len(diff_all) == 1
     assert diff_all[0].status == Status.DELETE
-    assert diff_all[0].changed_by_other == user_remote
-    # Deleted by local
-    diff_all = index_remote.diff(index_local)
-    assert len(diff_all) == 1
-    assert diff_all[0].status == Status.DELETE
-    assert diff_all[0].changed_by_other == user_local
+    assert diff_all[0].changed_by_other is None
 
 
 def test_add_data(case_wippolder, data_wippolder_gpkg, data_wippolder_gpkg_modified,
                      user_local, user_remote):
-    """Can we report that a new data was added?"""
+    """Can we report that a new data was added by the remote?"""
     # Added by remote
     case_local = deepcopy(case_wippolder)
-    (case_remote := deepcopy(case_wippolder)).add_data(data_wippolder_gpkg)
-    (index_local := Index()).add_case(case_local)
-    (index_remote := Index()).add_case(case_remote)
-    diff_all = index_local.diff(index_remote)
-    assert len(diff_all) == 1
-    assert diff_all[0].status == Status.ADD
-    assert diff_all[0].changed_by_other == user_remote
-    # Added by local
-    (case_local := deepcopy(case_wippolder)).add_data(data_wippolder_gpkg)
-    case_remote = deepcopy(case_wippolder)
+    (case_remote := deepcopy(case_wippolder)).add_data(data_wippolder_gpkg_modified)
     (index_local := Index()).add_case(case_local)
     (index_remote := Index()).add_case(case_remote)
     diff_all = index_local.diff(index_remote)
@@ -161,29 +144,33 @@ def test_add_data(case_wippolder, data_wippolder_gpkg, data_wippolder_gpkg_modif
     assert diff_all[0].status == Status.ADD
     assert diff_all[0].changed_by_other == user_remote
 
+
 def test_delete_data(case_wippolder, data_wippolder_gpkg, data_wippolder_gpkg_modified,
                      user_local, user_remote):
-    """Can we report that a data was deleted?"""
+    """Can we report that a data was deleted by the remote?"""
     # Deleted by remote
     (case_local := deepcopy(case_wippolder)).add_data(data_wippolder_gpkg)
-    case_remote = deepcopy(case_wippolder)
+    (case_remote := deepcopy(case_wippolder)).add_data(data_wippolder_gpkg_modified)
+    case_remote.remove_data(DataName("wippolder.gpkg"))
+    # Mimic that another user deleted the data
+    case_remote.changed_by = user_remote
     (index_local := Index()).add_case(case_local)
     (index_remote := Index()).add_case(case_remote)
     diff_all = index_local.diff(index_remote)
     assert len(diff_all) == 1
     assert diff_all[0].status == Status.DELETE
     assert diff_all[0].changed_by_other == user_remote
-    # Deleted by local
-    diff_all = index_remote.diff(index_local)
-    assert len(diff_all) == 1
-    assert diff_all[0].status == Status.DELETE
-    assert diff_all[0].changed_by_other == user_local
+
 
 def test_modify_case(case_wippolder, user_remote):
     """Can we report that a case was modified? Even if the case doesn't contain data?"""
     # Modified by remote
-    (case_local := deepcopy(case_wippolder)).description = "Local description"
-    (case_remote := deepcopy(case_wippolder)).description = "New description on remote"
+    case_local = deepcopy(case_wippolder)
+    case_remote = deepcopy(case_wippolder)
+    case_local.description = "Local description"
+    case_remote.description = "New description on remote"
+    # Mimic that another user deleted the data
+    case_remote.changed_by = user_remote
     (index_local := Index()).add_case(case_local)
     (index_remote := Index()).add_case(case_remote)
     diff_all = index_local.diff(index_remote)
@@ -191,8 +178,6 @@ def test_modify_case(case_wippolder, user_remote):
     for d in diff_all:
         assert d.changed_by_other == user_remote
         assert d.status == Status.MODIFY
-    # Modified by local
-    pytest.fail("not implemented")
 
 
 def test_modify_data(case_wippolder, data_wippolder_gpkg, data_wippolder_gpkg_modified,

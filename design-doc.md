@@ -448,6 +448,78 @@ Conflicts between the local and remote repository are resolved according to the 
 The [pull](#pull) command overwrites the local with the contents of the remote repository.
 The [push](#push) command overwrites the remote with the content of the local repository.
 
+#### diff
+
+The data structure of diff:
+
+```
+local-casespec  remote-casespec new|delete|modify   changed-by  [member]    [local-value]   [remote-value]
+
+# New case
+null    case-B  new user1
+
+# Deleted case
+case-C  null    delete  user2
+
+# New data entry
+case-A/null case-A/data-B   new user1
+
+# Deleted data entry
+case-A/data-C   case-A/null delete  user2
+
+# Modified case
+case-A  case-A  modify  user2   description value_local value_remote
+
+# Modified data entry
+case-A/data-A   case-A/data-A   modify  user1   license value_local value_remote
+case-A/data-A   case-A/data-A   modify  user1   format value_local value_remote
+case-A/data-A   case-A/data-A   modify  user1   extent_original_srs wkt_original_local wkt_original_remote
+```
+
+The formatted output of diff:
+
+```shell
+# New case
+new case case-B
+--- local/null
++++ remote/case-B
+
+# Deleted case
+deleted case case-C
+--- local/case-C
+--- remote/null
+
+# New data entry
+new data case-A/data-B
+--- local/case-A/null
++++ remote/case-A/data-B
+
+# Deleted data entry
+deleted data case-A/data-C
+--- local/case-A/data-C
++++ remote/case-A/null
+
+# Case description has changed
+--- local/case-A
++++ remote/case-A
+
+-description=value_old
++description=value_new
+
+# Data entry has changed
+--- local/case-A/data-A
++++ remote/case-A/data-A
+
+-license=value_old
++license=value_new
+
+-format=value_old
++format=value_new
+
+-extent_original_srs=wkt_original_old
++extent_original_srs=wkt_original_new
+```
+
 #### push 
 
 The scenarios below describe the change of a specific case.
@@ -494,6 +566,8 @@ Firstly, the repository integrity is verified ([verify](#verify-remote)).
 If there are changed cases that haven't been pushed...
 The `pull` operation also places a LOCK on the remote, to prevent it from change during the download.
 Once the download is complete, the LOCK is removed.
+
+
 
 ### Data files
 

@@ -28,6 +28,7 @@ logger = getLogger(__name__)
 
 
 class Status(Enum):
+    ADD_OR_DELETE = auto()
     ADD = auto()
     DELETE = auto()
     MODIFY = auto()
@@ -36,7 +37,7 @@ class Status(Enum):
 @dataclass(repr=True, order=True)
 class IndexDiff:
     status: Status
-    changed_by_other: User
+    changed_by_other: User | None = None
     casespec_self: CaseSpec | None = None
     casespec_other: CaseSpec | None = None
     member: str | None = None
@@ -165,87 +166,94 @@ class Index:
         return Index(cases=cases_in_index)
 
     def diff(self, other: Self) -> list[IndexDiff]:
-        """Compare two indices and return the difference."""
+        """Compare the 'other' index to 'self'.
+        The difference is not symmetrical, and additions and deletions are determined
+        with respect to 'self'.
+        The IndexDiff.status answers the question, "What operation does the 'other' do to 'self'?".
+        """
         diff_all = []
         if len(self.cases) == 0 and len(other.cases) == 0:
             return diff_all
         # Compare the cases that exist in both
         for case_name, case_self in self.cases.items():
             if (case_other := other.cases.get(case_name, None)) is not None:
-                for df_name, df_self in case_self.data.items():
-                    casespec = CaseSpec(case_name=case_name, data_name=df_name)
-                    df_other = case_other.data.get(df_name, None)
-                    if df_other is not None:
+                for data_name, data_self in case_self.data.items():
+                    casespec = CaseSpec(case_name=case_name, data_name=data_name)
+                    data_other = case_other.data.get(data_name, None)
+                    if data_other is not None:
                         for member in fields(Data):
                             if member.name not in ("name", "changed_by"):
-                                value_self = getattr(df_self, member.name)
-                                value_other = getattr(df_other, member.name)
+                                value_self = getattr(data_self, member.name)
+                                value_other = getattr(data_other, member.name)
                                 if value_self != value_other:
                                     diff_all.append(
                                         IndexDiff(
                                             casespec_self=casespec,
                                             casespec_other=casespec,
                                             status=Status.MODIFY,
-                                            changed_by_other=df_other.changed_by,
+                                            changed_by_other=data_other.changed_by,
                                             value_self=value_self,
                                             value_other=value_other,
                                             member=member.name,
                                         )
                                     )
                     else:
-                        deleted = True  # TODO check deletions file of remote
-                        changed_by = (
-                            User("", "") if deleted else df_self.changed_by
-                        )  # TODO deletions file of remote
                         diff_all.append(
                             IndexDiff(
                                 casespec_self=casespec,
                                 casespec_other=None,
-                                status=Status.DELETE if deleted else Status.ADD,
-                                changed_by_other=changed_by,
+                                status=Status.DELETE,
+                                changed_by_other=case_other.changed_by,
                             )
                         )
                 diff_other_data = set(case_other.data.keys()).difference(
                     set(case_self.data.keys())
                 )
-                for df_name in diff_other_data:
-                    deleted = True  # TODO check deletions file of local
-                    remote_user = User("", "")
-                    changed_by = get_current_user() if deleted else remote_user # TODO deletions file of local
+                for data_name in diff_other_data:
                     diff_all.append(
                         IndexDiff(
                             casespec_self=None,
-                            casespec_other=CaseSpec(case_name, df_name),
-                            status=Status.DELETE if deleted else Status.ADD,
-                            changed_by_other=changed_by,
+                            casespec_other=CaseSpec(case_name, data_name),
+                            status=Status.ADD,
+                            changed_by_other=case_other.get_data(data_name).changed_by,
+                        )
+                    )
+                # Check if any of the case attributes have changed
+                if case_self.description != case_other.description:
+                    diff_all.append(
+                        IndexDiff(
+                            casespec_self=CaseSpec(case_name=case_name),
+                            casespec_other=CaseSpec(case_name=case_name),
+                            status=Status.MODIFY,
+                            changed_by_other=case_other.changed_by,
+                            member="description",
+                            value_self=case_self.description,
+                            value_other=case_other.description,
                         )
                     )
             else:
-                deleted = True  # TODO check deletions file of remote
-                remote_user = User("", "")
-                changed_by = remote_user if deleted else get_current_user()  # TODO deletions file of remote
+                # The case doesn't exist in the other index, not much that we can report
                 diff_all.append(
                     IndexDiff(
                         casespec_self=CaseSpec(case_name=case_name),
                         casespec_other=None,
-                        status=Status.DELETE if deleted else Status.ADD,
-                        changed_by_other=changed_by,
+                        status=Status.DELETE,
+                        changed_by_other=None,
                     )
                 )
         diff_other_cases = set(other.cases.keys()).difference(set(self.cases.keys()))
         for case_name in diff_other_cases:
-            deleted = True  # TODO check deletions file of local
-            remote_user = User("", "")
-            changed_by = get_current_user if deleted else remote_user  # TODO deletions file of local
+            # The other has a case that self does not
             diff_all.append(
                 IndexDiff(
                     casespec_self=None,
                     casespec_other=CaseSpec(case_name=case_name),
-                    status=Status.DELETE if deleted else Status.ADD,
-                    changed_by_other=changed_by,
+                    status=Status.ADD,
+                    changed_by_other=other.cases.get(case_name).changed_by,
                 )
             )
         return diff_all
+
 
 @dataclass(repr=True)
 class Repository:
@@ -338,10 +346,14 @@ class Repository:
             # Add/Update the specified data to the case
             data_paths = parse_pathspec(pathspec, as_data=as_data)
             for p in data_paths:
-                df = case.add_from_path(p, casespec=casespec, data_license=license,
-                                        data_format=format,
-                                        data_description=data_description,
-                                        data_changed_by=get_current_user())
+                df = case.add_from_path(
+                    p,
+                    casespec=casespec,
+                    data_license=license,
+                    data_format=format,
+                    data_description=data_description,
+                    data_changed_by=get_current_user(),
+                )
                 self.copy_data(p, casespec)
                 logger.info(f"Added {df.name} to {case.name}")
         self.index.add_case(case)
@@ -382,9 +394,7 @@ class Repository:
                 # Rename the file when copied into the case
                 copy2(
                     path,
-                    self.path_cases.joinpath(
-                        casespec.case_name, casespec.data_name
-                    ),
+                    self.path_cases.joinpath(casespec.case_name, casespec.data_name),
                 )
             else:
                 # Keep the file name
@@ -394,9 +404,7 @@ class Repository:
                 # Copying a directory as a single data entry under a new name
                 copytree(
                     path,
-                    self.path_cases.joinpath(
-                        casespec.case_name, casespec.data_name
-                    ),
+                    self.path_cases.joinpath(casespec.case_name, casespec.data_name),
                     dirs_exist_ok=True,
                 )
             else:

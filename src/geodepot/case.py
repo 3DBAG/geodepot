@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Self, NewType
 
-from geodepot.config import User
+from geodepot.config import User, get_current_user
 from geodepot.data import Data, DataName
 
 CaseName = NewType("CaseName", str)
@@ -31,10 +31,15 @@ class CaseSpec:
 
 @dataclass(repr=True, order=True)
 class Case:
+    """A test case.
+
+    changed_by: The User that made the last modification on the case.
+    """
     name: CaseName
     description: str | None
     sha1: str | None = None
     data: dict[DataName, Data] = field(default_factory=dict)
+    changed_by: User | None = None
 
     def add_from_path(self, source_path: Path, casespec: CaseSpec = None,
                       data_license: str = None, data_format: str = None,
@@ -47,12 +52,14 @@ class Case:
 
     def add_data(self, data: Data):
         self.data[data.name] = data
+        self.changed_by = data.changed_by
 
     def get_data(self, name: DataName) -> Data | None:
         # TODO: maybe this should take a CaseSpec as argument instead of just a DataName
         return self.data.get(name)
 
     def remove_data(self, name: DataName) -> Data | None:
+        self.changed_by = get_current_user()
         return self.data.pop(name, None)
 
     def compress(self):
