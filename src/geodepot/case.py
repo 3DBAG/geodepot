@@ -20,7 +20,7 @@ class CaseSpec:
         """Parse the case specifier."""
         return CaseSpec(*casespec.split("/"))
 
-    def as_path(self) -> Path:
+    def to_path(self) -> Path:
         if self.case_name is not None and self.data_file_name is not None:
             return Path(self.case_name, self.data_file_name)
         elif self.case_name is not None:

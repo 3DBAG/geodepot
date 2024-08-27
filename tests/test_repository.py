@@ -44,7 +44,7 @@ def test_remove_data(repo, wippolder_dir):
     )
     casespec = CaseSpec("wippolder", "wippolder.gpkg")
     repo.remove(casespec)
-    assert repo.path_cases.joinpath(casespec.as_path()).exists() is False
+    assert repo.path_cases.joinpath(casespec.to_path()).exists() is False
     assert repo.get_data_file(casespec) is None
 
 

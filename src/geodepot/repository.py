@@ -375,7 +375,7 @@ class Repository:
     def get_data_path(self, casespec: CaseSpec) -> Path | None:
         """Retrieve the full path to an existing data entry."""
         if (_ := self.get_data_file(casespec)) is not None:
-            return self.path_cases.joinpath(casespec.as_path())
+            return self.path_cases.joinpath(casespec.to_path())
         logger.info(f"The entry {casespec} does not exist in the repository.")
         return None
 
@@ -417,7 +417,7 @@ class Repository:
             if (
                 case := self.index.remove_case(case_name=casespec.case_name)
             ) is not None:
-                rmtree(self.path_cases.joinpath(casespec.as_path()))
+                rmtree(self.path_cases.joinpath(casespec.to_path()))
                 logger.info(f"Removed {case.name} from the repository")
             else:
                 logger.info(f"The case {casespec} does not exist in the repository")
@@ -425,7 +425,7 @@ class Repository:
             if (case := self.get_case(casespec)) is not None:
                 df = case.remove_data_file(casespec.data_file_name)
                 if df is not None:
-                    if (p := self.path_cases.joinpath(casespec.as_path())).is_dir():
+                    if (p := self.path_cases.joinpath(casespec.to_path())).is_dir():
                         p.rmdir()
                     else:
                         p.unlink(missing_ok=False)

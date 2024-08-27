@@ -159,6 +159,11 @@ If the geodepot index needs to be parsed, the CMake commands alone won't suffice
 In that case, I would need to compile the C++ API into an exe, and run that exe for the functions.
 See [CMake custom commands](https://cmake.org/cmake/help/latest/guide/tutorial/Adding%20a%20Custom%20Command%20and%20Generated%20File.html).
 
+Even if I could write `GeodepotInit` and `GeodepotGet` purely in cmake-language, using `FetchContent` it may be better to call a compiled exe that is part of the C++ API.
+That is, because, 
+1. the C++ implementation is the single source of truth,
+2. if I need more complex operations in the future, I won't be limited by the cmake-language.
+
 #### QGIS plugin
 Support adding, viewing, modifying cases.
 
