@@ -21,7 +21,7 @@ from osgeo.osr import SpatialReference
 from geodepot import GEODEPOT_CONFIG_LOCAL, GEODEPOT_INDEX, GEODEPOT_INDEX_EPSG
 from geodepot.case import CaseName, Case, CaseSpec
 from geodepot.config import Config, get_current_user, User
-from geodepot.data_file import DataFile
+from geodepot.data import Data
 
 UseExceptions()
 logger = getLogger(__name__)
@@ -45,7 +45,7 @@ class IndexDiff:
 
 
 def create_modified_diff(
-    casespec: CaseSpec, df_self: DataFile, df_other: DataFile, member: str
+    casespec: CaseSpec, df_self: Data, df_other: Data, member: str
 ) -> IndexDiff:
     return IndexDiff(
         casespec_self=casespec,
@@ -78,14 +78,14 @@ class Index:
                 FieldDefn("case_name", OFTString),
                 FieldDefn("case_sha1", OFTString),
                 FieldDefn("case_description", OFTString),
-                FieldDefn("file_name", OFTString),
-                FieldDefn("file_sha1", OFTString),
-                FieldDefn("file_description", OFTString),
-                FieldDefn("file_format", OFTString),
-                FieldDefn("file_changed_by", OFTString),
-                FieldDefn("file_license", OFTString),
-                FieldDefn("file_srs", OFTString),
-                FieldDefn("file_extent_original_srs", OFTString),
+                FieldDefn("data_name", OFTString),
+                FieldDefn("data_sha1", OFTString),
+                FieldDefn("data_description", OFTString),
+                FieldDefn("data_format", OFTString),
+                FieldDefn("data_changed_by", OFTString),
+                FieldDefn("data_license", OFTString),
+                FieldDefn("data_srs", OFTString),
+                FieldDefn("data_extent_original_srs", OFTString),
             )
             fid = 0
             # We simple write a new index on serialization
@@ -105,24 +105,24 @@ class Index:
                     defn.AddFieldDefn(fdef)
 
                 for case_name, case in self.cases.items():
-                    for data in case.data_files.values():
+                    for data in case.data.values():
                         feat = Feature(defn)
                         feat["fid"] = fid
                         feat["case_name"] = case_name
                         feat["case_sha1"] = case.sha1
                         feat["case_description"] = case.description
-                        feat["file_name"] = data.name
-                        feat["file_sha1"] = data.sha1
-                        feat["file_description"] = data.description
-                        feat["file_format"] = data.format
-                        feat["file_changed_by"] = (
+                        feat["data_name"] = data.name
+                        feat["data_sha1"] = data.sha1
+                        feat["data_description"] = data.description
+                        feat["data_format"] = data.format
+                        feat["data_changed_by"] = (
                             data.changed_by.to_pretty()
                             if data.changed_by is not None
                             else None
                         )
-                        feat["file_license"] = data.license
-                        feat["file_srs"] = data.bbox.srs_wkt
-                        feat["file_extent_original_srs"] = (
+                        feat["data_license"] = data.license
+                        feat["data_srs"] = data.bbox.srs_wkt
+                        feat["data_extent_original_srs"] = (
                             data.bbox.bbox_original_srs.to_wkt()
                         )
                         if data.bbox.bbox_epsg_3857 is not None:
@@ -156,8 +156,8 @@ class Index:
                             description=feat["case_description"],
                         ),
                     )
-                    df = DataFile.from_ogr_feature(feat)
-                    case.add_data_file(df)
+                    df = Data.from_ogr_feature(feat)
+                    case.add_data(df)
                     cases_in_index[case_name] = case
         except Exception as e:
             logger.critical(f"Failed to deserialize index with exception {e}")
@@ -172,11 +172,11 @@ class Index:
         # Compare the cases that exist in both
         for case_name, case_self in self.cases.items():
             if (case_other := other.cases.get(case_name, None)) is not None:
-                for df_name, df_self in case_self.data_files.items():
-                    casespec = CaseSpec(case_name=case_name, data_file_name=df_name)
-                    df_other = case_other.data_files.get(df_name, None)
+                for df_name, df_self in case_self.data.items():
+                    casespec = CaseSpec(case_name=case_name, data_name=df_name)
+                    df_other = case_other.data.get(df_name, None)
                     if df_other is not None:
-                        for member in fields(DataFile):
+                        for member in fields(Data):
                             if member.name not in ("name", "changed_by"):
                                 value_self = getattr(df_self, member.name)
                                 value_other = getattr(df_other, member.name)
@@ -205,8 +205,8 @@ class Index:
                                 changed_by_other=changed_by,
                             )
                         )
-                diff_other_data = set(case_other.data_files.keys()).difference(
-                    set(case_self.data_files.keys())
+                diff_other_data = set(case_other.data.keys()).difference(
+                    set(case_self.data.keys())
                 )
                 for df_name in diff_other_data:
                     deleted = True  # TODO check deletions file of local
@@ -304,7 +304,7 @@ class Repository:
         # Determine if we need to update a case's description or a data's description
         case_description = None
         data_description = None
-        if casespec.data_file_name is not None:
+        if casespec.data_name is not None:
             data_description = description
         else:
             case_description = description
@@ -319,7 +319,7 @@ class Repository:
             if case_description is not None:
                 case.description = case_description
                 logger.info(f"Updated the description on the case {case.name}")
-            if (df := self.get_data_file(casespec)) is not None:
+            if (df := self.get_data(casespec)) is not None:
                 if data_description is not None:
                     df.description = data_description
                     logger.info(f"Updated the description on the data entry {casespec}")
@@ -338,14 +338,10 @@ class Repository:
             # Add/Update the specified data to the case
             data_paths = parse_pathspec(pathspec, as_data=as_data)
             for p in data_paths:
-                df = case.add_from_path(
-                    p,
-                    casespec=casespec,
-                    data_license=license,
-                    format=format,
-                    description=data_description,
-                    changed_by=get_current_user(),
-                )
+                df = case.add_from_path(p, casespec=casespec, data_license=license,
+                                        data_format=format,
+                                        data_description=data_description,
+                                        data_changed_by=get_current_user())
                 self.copy_data(p, casespec)
                 logger.info(f"Added {df.name} to {case.name}")
         self.index.add_case(case)
@@ -363,18 +359,18 @@ class Repository:
         self.path_cases.joinpath(casespec.case_name).mkdir()
         return self.get_case(casespec)
 
-    def get_data_file(self, casespec: CaseSpec) -> DataFile | None:
+    def get_data(self, casespec: CaseSpec) -> Data | None:
         """Retrieve an existing data entry.
         Return None if the data entry does not exist."""
         if (case := self.get_case(casespec)) is not None:
-            if casespec.data_file_name is not None:
-                return case.get_data_file(casespec.data_file_name)
+            if casespec.data_name is not None:
+                return case.get_data(casespec.data_name)
         logger.info(f"The entry {casespec} does not exist in the repository.")
         return None
 
     def get_data_path(self, casespec: CaseSpec) -> Path | None:
         """Retrieve the full path to an existing data entry."""
-        if (_ := self.get_data_file(casespec)) is not None:
+        if (_ := self.get_data(casespec)) is not None:
             return self.path_cases.joinpath(casespec.to_path())
         logger.info(f"The entry {casespec} does not exist in the repository.")
         return None
@@ -382,24 +378,24 @@ class Repository:
     def copy_data(self, path: Path, casespec: CaseSpec):
         """Copies a data entry into the repository."""
         if path.is_file():
-            if casespec.data_file_name is not None:
+            if casespec.data_name is not None:
                 # Rename the file when copied into the case
                 copy2(
                     path,
                     self.path_cases.joinpath(
-                        casespec.case_name, casespec.data_file_name
+                        casespec.case_name, casespec.data_name
                     ),
                 )
             else:
                 # Keep the file name
                 copy2(path, self.path_cases.joinpath(casespec.case_name, path.name))
         else:
-            if casespec.data_file_name is not None:
+            if casespec.data_name is not None:
                 # Copying a directory as a single data entry under a new name
                 copytree(
                     path,
                     self.path_cases.joinpath(
-                        casespec.case_name, casespec.data_file_name
+                        casespec.case_name, casespec.data_name
                     ),
                     dirs_exist_ok=True,
                 )
@@ -412,7 +408,7 @@ class Repository:
 
     def remove(self, casespec: CaseSpec):
         """Remove an entry from the repository."""
-        if casespec.data_file_name is None:
+        if casespec.data_name is None:
             # Remove the whole case
             if (
                 case := self.index.remove_case(case_name=casespec.case_name)
@@ -423,7 +419,7 @@ class Repository:
                 logger.info(f"The case {casespec} does not exist in the repository")
         else:
             if (case := self.get_case(casespec)) is not None:
-                df = case.remove_data_file(casespec.data_file_name)
+                df = case.remove_data(casespec.data_name)
                 if df is not None:
                     if (p := self.path_cases.joinpath(casespec.to_path())).is_dir():
                         p.rmdir()

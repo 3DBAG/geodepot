@@ -29,7 +29,7 @@ ogrUseExceptions()
 
 pdal_filter_stats = {"type": "filters.stats", "dimensions": "X,Y"}
 
-DataFileName = NewType("DataFileName", str)
+DataName = NewType("DataName", str)
 
 
 class Drivers(Enum):
@@ -76,10 +76,10 @@ class BBoxSRS:
 
 
 @dataclass(repr=True, init=False, order=True)
-class DataFile:
-    """A data file in the repository."""
+class Data:
+    """A data item in the repository."""
 
-    name: DataFileName | None = None
+    name: DataName | None = None
     license: str | None = None
     format: str | None = None
     description: str | None = None
@@ -95,10 +95,10 @@ class DataFile:
         data_format: str = None,
         description: str = None,
         changed_by: User = None,
-        data_name: str | DataFileName = None,
+        data_name: str | DataName = None,
     ):
         self.name = (
-            DataFileName(data_name) if data_name is not None else DataFileName(path.name)
+            DataName(data_name) if data_name is not None else DataName(path.name)
         )
         self.license = data_license
         self.format = data_format
@@ -230,7 +230,7 @@ class DataFile:
                         )
                 else:
                     logger.info(
-                        f"Could not retrieve the SRS of {path} and could not reproject the BBox to EPSG:{target_epsg}. The 'file_extent_original_srs' field contains the extent in original coordinates."
+                        f"Could not retrieve the SRS of {path} and could not reproject the BBox to EPSG:{target_epsg}. The 'data_extent_original_srs' field contains the extent in original coordinates."
                     )
                 return bbox_srs
         elif self.driver == Drivers.OGR:
@@ -256,7 +256,7 @@ class DataFile:
                         )
                 else:
                     logger.info(
-                        f"Could not retrieve the SRS of {path} and could not reproject the BBox to EPSG:{target_epsg}. The 'file_extent_original_srs' field contains the extent in original coordinates."
+                        f"Could not retrieve the SRS of {path} and could not reproject the BBox to EPSG:{target_epsg}. The 'data_extent_original_srs' field contains the extent in original coordinates."
                     )
                 return bbox_srs
         elif self.driver == Drivers.PDAL:
@@ -284,7 +284,7 @@ class DataFile:
                     )
             else:
                 logger.info(
-                    f"Could not retrieve the SRS of {path} and could not reproject the BBox to EPSG:{target_epsg}. The 'file_extent_original_srs' field contains the extent in original coordinates."
+                    f"Could not retrieve the SRS of {path} and could not reproject the BBox to EPSG:{target_epsg}. The 'data_extent_original_srs' field contains the extent in original coordinates."
                 )
             return bbox_srs
         else:
@@ -293,19 +293,19 @@ class DataFile:
     @classmethod
     def from_ogr_feature(cls, feature: Feature) -> Self:
         df = cls.__new__(cls)
-        df.name = DataFileName(feature["file_name"])
-        df.sha1 = feature["file_sha1"]
-        df.description = feature["file_description"]
-        df.format = feature["file_format"]
-        df.changed_by = User.from_pretty(feature["file_changed_by"])
-        df.license = feature["file_license"]
+        df.name = DataName(feature["data_name"])
+        df.sha1 = feature["data_sha1"]
+        df.description = feature["data_description"]
+        df.format = feature["data_format"]
+        df.changed_by = User.from_pretty(feature["data_changed_by"])
+        df.license = feature["data_license"]
         if (gref := feature.GetGeometryRef()) is not None:
             extent = gref.GetEnvelope()
             bbox = BBox(extent[0], extent[2], extent[1], extent[3])
         else:
             bbox = None
         extent_original = CreateGeometryFromWkt(
-            feature["file_extent_original_srs"]
+            feature["data_extent_original_srs"]
         ).GetEnvelope()
         df.bbox = BBoxSRS(
             bbox_epsg_3857=bbox,
@@ -315,7 +315,7 @@ class DataFile:
                 extent_original[1],
                 extent_original[3],
             ),
-            srs_wkt=feature["file_srs"],
+            srs_wkt=feature["data_srs"],
         )
         return df
 

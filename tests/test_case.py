@@ -1,7 +1,7 @@
 import pytest
 
 from geodepot.case import *
-from geodepot.data_file import DataFile
+from geodepot.data import Data
 
 
 @pytest.mark.parametrize(
@@ -9,7 +9,7 @@ from geodepot.data_file import DataFile
     (
         (
             "wippolder/wippolder.gpkg",
-            CaseSpec(case_name="wippolder", data_file_name="wippolder.gpkg"),
+            CaseSpec(case_name="wippolder", data_name="wippolder.gpkg"),
         ),
         ("wippolder", CaseSpec(case_name="wippolder")),
     ),
@@ -22,5 +22,5 @@ def test_casespec(casespec, expected):
 def test_case(data_dir):
     case = Case("wippolder", "Some case description.\nMultiline.\nText")
     for df in ("wippolder.gpkg", "wippolder.las", "3dbag_one.city.json"):
-        case.add_data_file(DataFile(data_dir / df))
+        case.add_data(Data(data_dir / df))
     print(case)

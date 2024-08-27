@@ -2,7 +2,7 @@ from copy import deepcopy
 
 import pytest
 
-from geodepot.data_file import DataFileName, BBoxSRS, BBox, Drivers
+from geodepot.data import DataName, BBoxSRS, BBox, Drivers
 from geodepot.repository import *
 
 
@@ -31,14 +31,14 @@ def user_remote() -> User:
 @pytest.fixture(scope="function")
 def case_wippolder() -> Case:
     return Case(
-        name=CaseName("wippolder"), description=None, sha1=None, data_files=dict()
+        name=CaseName("wippolder"), description=None, sha1=None, data=dict()
     )
 
 
 @pytest.fixture(scope="function")
-def data_wippolder_gpkg(user_local) -> DataFile:
-    df = DataFile.__new__(DataFile)
-    df.name = DataFileName("wippolder.gpkg")
+def data_wippolder_gpkg(user_local) -> Data:
+    df = Data.__new__(Data)
+    df.name = DataName("wippolder.gpkg")
     df.changed_by = user_local
     df.description = None
     df.driver = Drivers.OGR
@@ -61,9 +61,9 @@ def data_wippolder_gpkg(user_local) -> DataFile:
 
 
 @pytest.fixture(scope="function")
-def data_wippolder_gpkg_modified(user_remote) -> DataFile:
-    df = DataFile.__new__(DataFile)
-    df.name = DataFileName("wippolder.gpkg")
+def data_wippolder_gpkg_modified(user_remote) -> Data:
+    df = Data.__new__(Data)
+    df.name = DataName("wippolder.gpkg")
     df.changed_by = user_remote
     df.description = None
     df.driver = Drivers.OGR
@@ -86,9 +86,9 @@ def data_wippolder_gpkg_modified(user_remote) -> DataFile:
 
 
 @pytest.fixture(scope="function")
-def data_wippolder_las(user_local) -> DataFile:
-    df = DataFile.__new__(DataFile)
-    df.name = DataFileName("wippolder.las")
+def data_wippolder_las(user_local) -> Data:
+    df = Data.__new__(Data)
+    df.name = DataName("wippolder.las")
     df.changed_by = user_local
     df.description = None
     df.driver = Drivers.PDAL
@@ -144,7 +144,7 @@ def test_add_data(case_wippolder, data_wippolder_gpkg, data_wippolder_gpkg_modif
     """Can we report that a new data was added?"""
     # Added by remote
     case_local = deepcopy(case_wippolder)
-    (case_remote := deepcopy(case_wippolder)).add_data_file(data_wippolder_gpkg)
+    (case_remote := deepcopy(case_wippolder)).add_data(data_wippolder_gpkg)
     (index_local := Index()).add_case(case_local)
     (index_remote := Index()).add_case(case_remote)
     diff_all = index_local.diff(index_remote)
@@ -152,7 +152,7 @@ def test_add_data(case_wippolder, data_wippolder_gpkg, data_wippolder_gpkg_modif
     assert diff_all[0].status == Status.ADD
     assert diff_all[0].changed_by_other == user_remote
     # Added by local
-    (case_local := deepcopy(case_wippolder)).add_data_file(data_wippolder_gpkg)
+    (case_local := deepcopy(case_wippolder)).add_data(data_wippolder_gpkg)
     case_remote = deepcopy(case_wippolder)
     (index_local := Index()).add_case(case_local)
     (index_remote := Index()).add_case(case_remote)
@@ -165,7 +165,7 @@ def test_delete_data(case_wippolder, data_wippolder_gpkg, data_wippolder_gpkg_mo
                      user_local, user_remote):
     """Can we report that a data was deleted?"""
     # Deleted by remote
-    (case_local := deepcopy(case_wippolder)).add_data_file(data_wippolder_gpkg)
+    (case_local := deepcopy(case_wippolder)).add_data(data_wippolder_gpkg)
     case_remote = deepcopy(case_wippolder)
     (index_local := Index()).add_case(case_local)
     (index_remote := Index()).add_case(case_remote)
@@ -199,8 +199,8 @@ def test_modify_data(case_wippolder, data_wippolder_gpkg, data_wippolder_gpkg_mo
                      user_local, user_remote):
     """Can we report that a data was modified?"""
     # Modified by remote
-    (case_local := deepcopy(case_wippolder)).add_data_file(data_wippolder_gpkg)
-    (case_remote := deepcopy(case_wippolder)).add_data_file(data_wippolder_gpkg_modified)
+    (case_local := deepcopy(case_wippolder)).add_data(data_wippolder_gpkg)
+    (case_remote := deepcopy(case_wippolder)).add_data(data_wippolder_gpkg_modified)
     (index_local := Index()).add_case(case_local)
     (index_remote := Index()).add_case(case_remote)
     diff_all = index_local.diff(index_remote)

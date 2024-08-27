@@ -2,7 +2,7 @@ from copy import deepcopy
 
 import pytest
 
-from geodepot.data_file import DataFileName
+from geodepot.data import DataName
 from geodepot.repository import *
 
 
@@ -45,7 +45,7 @@ def test_remove_data(repo, wippolder_dir):
     casespec = CaseSpec("wippolder", "wippolder.gpkg")
     repo.remove(casespec)
     assert repo.path_cases.joinpath(casespec.to_path()).exists() is False
-    assert repo.get_data_file(casespec) is None
+    assert repo.get_data(casespec) is None
 
 
 def test_empty(mock_temp_project):
@@ -82,8 +82,8 @@ def test_add_files(repo, wippolder_dir):
         license="CC-0",
     )
     assert (
-        repo.get_data_file(
-            CaseSpec(CaseName("wippolder"), DataFileName("wippolder.gpkg"))
+        repo.get_data(
+            CaseSpec(CaseName("wippolder"), DataName("wippolder.gpkg"))
         )
         is not None
     )
@@ -96,8 +96,8 @@ def test_add_files(repo, wippolder_dir):
         license="CC-0",
     )
     assert (
-        repo.get_data_file(
-            CaseSpec(CaseName("wippolder"), DataFileName("wippolder.las"))
+        repo.get_data(
+            CaseSpec(CaseName("wippolder"), DataName("wippolder.las"))
         )
         is not None
     )
@@ -108,25 +108,25 @@ def test_add_directory(repo, wippolder_dir):
     """Can we add a directory of data files?"""
     repo.add("wippolder", pathspec=str(wippolder_dir))
     case_wippolder = repo.get_case(CaseSpec(case_name="wippolder"))
-    assert len(case_wippolder.data_files) == 5
+    assert len(case_wippolder.data) == 5
 
 
 def test_add_directory_as_data(repo, wippolder_dir):
     """Can we add a directory as a single data entry?"""
     repo.add("wippolder/wippolder_data_file", pathspec=str(wippolder_dir), as_data=True)
     case_wippolder = repo.get_case(CaseSpec(case_name="wippolder"))
-    assert len(case_wippolder.data_files) == 1
+    assert len(case_wippolder.data) == 1
 
 
 def test_update_data(repo, wippolder_dir):
     """Can we update a single data entry, renaming the input file in the process?"""
     repo.add("wippolder", pathspec=str(wippolder_dir / "wippolder.gpkg"))
-    df_old = deepcopy(repo.get_data_file(CaseSpec("wippolder", "wippolder.gpkg")))
+    df_old = deepcopy(repo.get_data(CaseSpec("wippolder", "wippolder.gpkg")))
     repo.add(
         "wippolder/wippolder.gpkg",
         pathspec=str(wippolder_dir / "wippolder_changed.gpkg"),
     )
-    df_updated = repo.get_data_file(CaseSpec("wippolder", "wippolder.gpkg"))
+    df_updated = repo.get_data(CaseSpec("wippolder", "wippolder.gpkg"))
     assert df_old.sha1 == "b1ec6506eb7858b0667281580c4f5a5aff6894b2"
     assert df_updated.sha1 == "ed8b3ccbaf14970a402efd68f7bfa7db20a2543a"
 
@@ -134,30 +134,30 @@ def test_update_data(repo, wippolder_dir):
 def test_add_description_data(repo, wippolder_dir):
     """Can we add description of a single data entry?"""
     repo.add("wippolder/wippolder.gpkg", pathspec=str(wippolder_dir / "wippolder.gpkg"))
-    df_old = deepcopy(repo.get_data_file(CaseSpec("wippolder", "wippolder.gpkg")))
+    df_old = deepcopy(repo.get_data(CaseSpec("wippolder", "wippolder.gpkg")))
     assert df_old.description is None
     repo.add("wippolder/wippolder.gpkg", pathspec=None, description="data description")
-    df_updated = repo.get_data_file(CaseSpec("wippolder", "wippolder.gpkg"))
+    df_updated = repo.get_data(CaseSpec("wippolder", "wippolder.gpkg"))
     assert df_updated.description == "data description"
 
 
 def test_add_description_case(repo, wippolder_dir):
     """Can we add description of a case?"""
     repo.add("wippolder", pathspec=str(wippolder_dir / "wippolder.gpkg"))
-    df_old = deepcopy(repo.get_data_file(CaseSpec("wippolder", "wippolder.gpkg")))
+    df_old = deepcopy(repo.get_data(CaseSpec("wippolder", "wippolder.gpkg")))
     assert df_old.description is None
     repo.add("wippolder/wippolder.gpkg", pathspec=None, description="case description")
-    df_updated = repo.get_data_file(CaseSpec("wippolder", "wippolder.gpkg"))
+    df_updated = repo.get_data(CaseSpec("wippolder", "wippolder.gpkg"))
     assert df_updated.description == "case description"
 
 
 def test_add_license_data(repo, wippolder_dir):
     """Can we add license to a data entry?"""
     repo.add("wippolder", pathspec=str(wippolder_dir / "wippolder.gpkg"))
-    df_old = deepcopy(repo.get_data_file(CaseSpec("wippolder", "wippolder.gpkg")))
+    df_old = deepcopy(repo.get_data(CaseSpec("wippolder", "wippolder.gpkg")))
     repo.add(
         "wippolder", pathspec=str(wippolder_dir / "wippolder.gpkg"), license="CC-0"
     )
-    df_updated = repo.get_data_file(CaseSpec("wippolder", "wippolder.gpkg"))
+    df_updated = repo.get_data(CaseSpec("wippolder", "wippolder.gpkg"))
     assert df_old.license is None
     assert df_updated.license == "CC-0"

@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Self, NewType
 
 from geodepot.config import User
-from geodepot.data_file import DataFile, DataFileName
+from geodepot.data import Data, DataName
 
 CaseName = NewType("CaseName", str)
 
@@ -13,7 +13,7 @@ class CaseSpec:
     """Case specifier."""
 
     case_name: CaseName | None = None
-    data_file_name: DataFileName | None = None
+    data_name: DataName | None = None
 
     @classmethod
     def from_str(cls, casespec: str) -> Self:
@@ -21,8 +21,8 @@ class CaseSpec:
         return CaseSpec(*casespec.split("/"))
 
     def to_path(self) -> Path:
-        if self.case_name is not None and self.data_file_name is not None:
-            return Path(self.case_name, self.data_file_name)
+        if self.case_name is not None and self.data_name is not None:
+            return Path(self.case_name, self.data_name)
         elif self.case_name is not None:
             return Path(self.case_name)
         else:
@@ -34,26 +34,26 @@ class Case:
     name: CaseName
     description: str | None
     sha1: str | None = None
-    data_files: dict[DataFileName, DataFile] = field(default_factory=dict)
+    data: dict[DataName, Data] = field(default_factory=dict)
 
     def add_from_path(self, source_path: Path, casespec: CaseSpec = None,
-                      data_license: str = None, format: str = None,
-                      description: str = None, changed_by: User = None) -> DataFile:
-        df = DataFile(source_path, data_license=data_license, data_format=format,
-                      description=description, changed_by=changed_by,
-                      data_name=casespec.data_file_name if casespec is not None else None)
-        self.add_data_file(df)
+                      data_license: str = None, data_format: str = None,
+                      data_description: str = None, data_changed_by: User = None) -> Data:
+        df = Data(source_path, data_license=data_license, data_format=data_format,
+                  description=data_description, changed_by=data_changed_by,
+                  data_name=casespec.data_name if casespec is not None else None)
+        self.add_data(df)
         return df
 
-    def add_data_file(self, data_file: DataFile):
-        self.data_files[data_file.name] = data_file
+    def add_data(self, data: Data):
+        self.data[data.name] = data
 
-    def get_data_file(self, name: DataFileName) -> DataFile | None:
-        # TODO: maybe this should take a CaseSpec as argument instead of just a DataFileName
-        return self.data_files.get(name)
+    def get_data(self, name: DataName) -> Data | None:
+        # TODO: maybe this should take a CaseSpec as argument instead of just a DataName
+        return self.data.get(name)
 
-    def remove_data_file(self, name: DataFileName) -> DataFile | None:
-        return self.data_files.pop(name, None)
+    def remove_data(self, name: DataName) -> Data | None:
+        return self.data.pop(name, None)
 
     def compress(self):
         raise NotImplementedError

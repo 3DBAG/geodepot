@@ -1,6 +1,6 @@
 import pytest
 
-from geodepot.data_file import *
+from geodepot.data import *
 
 
 @pytest.mark.parametrize(
@@ -8,7 +8,7 @@ from geodepot.data_file import *
 )
 def test_data_file(mock_proj_lib, wippolder_dir, file_name):
     """Can we initialize a DataFile from a local file?"""
-    data_file = DataFile(wippolder_dir / file_name, "CC-0")
+    data_file = Data(wippolder_dir / file_name, "CC-0")
     assert data_file.bbox is not None
 
 
