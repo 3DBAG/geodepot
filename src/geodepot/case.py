@@ -44,11 +44,11 @@ class Case:
     def add_from_path(self, source_path: Path, casespec: CaseSpec = None,
                       data_license: str = None, data_format: str = None,
                       data_description: str = None, data_changed_by: User = None) -> Data:
-        df = Data(source_path, data_license=data_license, data_format=data_format,
+        data = Data(source_path, data_license=data_license, data_format=data_format,
                   description=data_description, changed_by=data_changed_by,
                   data_name=casespec.data_name if casespec is not None else None)
-        self.add_data(df)
-        return df
+        self.add_data(data)
+        return data
 
     def add_data(self, data: Data):
         self.data[data.name] = data

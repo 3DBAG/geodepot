@@ -309,6 +309,7 @@ class Repository:
         casespec = CaseSpec.from_str(casespec)
         if not yes:
             raise NotImplementedError
+        current_user = get_current_user()
         # Determine if we need to update a case's description or a data's description
         case_description = None
         data_description = None
@@ -322,20 +323,22 @@ class Repository:
         # Update the description of an existing case
         if case_description is not None:
             case.description = case_description
+            case.changed_by = current_user
+            logger.info(f"Updated the description on the case {case.name}")
         if pathspec is None:
             # Only update the license or description or format
-            if case_description is not None:
-                case.description = case_description
-                logger.info(f"Updated the description on the case {case.name}")
-            if (df := self.get_data(casespec)) is not None:
+            if (data := self.get_data(casespec)) is not None:
                 if data_description is not None:
-                    df.description = data_description
+                    data.description = data_description
+                    data.changed_by = current_user
                     logger.info(f"Updated the description on the data entry {casespec}")
                 if license is not None:
-                    df.license = license
+                    data.license = license
+                    data.changed_by = current_user
                     logger.info(f"Updated the license on the data entry {casespec}")
                 if format is not None:
-                    df.format = format
+                    data.format = format
+                    case.changed_by = current_user
                     logger.info(f"Updated the format on the data entry {casespec}")
             else:
                 logger.error(
@@ -346,16 +349,16 @@ class Repository:
             # Add/Update the specified data to the case
             data_paths = parse_pathspec(pathspec, as_data=as_data)
             for p in data_paths:
-                df = case.add_from_path(
+                data = case.add_from_path(
                     p,
                     casespec=casespec,
                     data_license=license,
                     data_format=format,
                     data_description=data_description,
-                    data_changed_by=get_current_user(),
+                    data_changed_by=current_user,
                 )
                 self.copy_data(p, casespec)
-                logger.info(f"Added {df.name} to {case.name}")
+                logger.info(f"Added {data.name} to {case.name}")
         self.index.add_case(case)
         self.write_index()
         logger.debug(f"Serialized the index to {self.path_index}")
@@ -427,14 +430,14 @@ class Repository:
                 logger.info(f"The case {casespec} does not exist in the repository")
         else:
             if (case := self.get_case(casespec)) is not None:
-                df = case.remove_data(casespec.data_name)
-                if df is not None:
+                data = case.remove_data(casespec.data_name)
+                if data is not None:
                     if (p := self.path_cases.joinpath(casespec.to_path())).is_dir():
                         p.rmdir()
                     else:
                         p.unlink(missing_ok=False)
                         # TODO: I could remove the whole case if there are no more files. Don't forget to remove the case from the index too.
-                    logger.info(f"Removed {df.name} from the repository")
+                    logger.info(f"Removed {data.name} from the repository")
                 else:
                     logger.info(
                         f"The data entry {casespec} does not exist in the repository"
