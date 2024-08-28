@@ -90,6 +90,12 @@ class Config:
         if other.remotes is not None:
             self.remotes = other.remotes
 
+    def add_remote(self, name: str, url: str):
+        self.remotes[name] = Remote(name=name, url=url)
+
+    def remove_remote(self, name: str):
+        del self.remotes[name]
+
 
 def as_config(dct: dict) -> Config | dict:
     """Deserialize a dict as a Config instance.
@@ -179,3 +185,22 @@ def get_config() -> Config:
 def get_current_user() -> User:
     config = get_config()
     return config.user
+
+
+def configure(key: str, value: str | None = None, global_config: bool = False) -> str | None:
+    """Get or set configuration values."""
+    config = get_global_config() if global_config else get_local_config()
+    section, variable = key.split(".", 1)
+    try:
+        sec_val = getattr(config, section)
+        var_val = getattr(sec_val, variable)
+    except AttributeError:
+        logger.error(f"Invalid configuration key: {key}")
+        return None
+    if value is None:
+        return var_val
+    else:
+        setattr(sec_val, variable, value)
+        logger.debug(f"Set {key} to {value} (global={global_config})")
+    config_path = get_global_config_path() if global_config else get_local_config_path()
+    config.write_to_file(config_path)

@@ -79,3 +79,16 @@ def test_user_from_pretty():
     user = User.from_pretty("Kovács János <janos@kovacs.me>")
     assert user.name == "Kovács János"
     assert user.email == "janos@kovacs.me"
+
+def test_configure_set(mock_user_home, mock_project_dir):
+    oldval = get_global_config().user.name
+    configure(key="user.name", value="My Name", global_config=True)
+    config = get_global_config()
+    assert config.user.name == "My Name"
+    configure(key="user.name", value=oldval, global_config=True)
+
+def test_configure_get(mock_user_home, mock_project_dir):
+    val = configure(key="user.name",  global_config=True)
+    assert val == "Kovács János"
+    config = get_global_config()
+    assert config.user.name == "Kovács János"

@@ -171,7 +171,7 @@ Support adding, viewing, modifying cases.
 
 the commands that have the same name as in git, but do sth different are confusing
 
-- [-] [config](#config)
+- [x] [config](#config)
 - [x] [init](#init)
 - [list](#list)
 - [show](#show)
@@ -181,9 +181,9 @@ the commands that have the same name as in git, but do sth different are confusi
 - [pull](#pull)
 - [push](#push)
 - [verify](#verify)
-- [remote](#remote-list)
-- [remote add](#remote-add)
-- [remote remove](#remote-remove)
+- [-] [remote](#remote-list)
+- [-] [remote add](#remote-add)
+- [-] [remote remove](#remote-remove)
 - [snapshot](#snapshot-list)
 - [snapshot save](#snapshot-save)
 - [snapshot load](#snapshot-load)
