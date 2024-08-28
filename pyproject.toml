@@ -20,7 +20,8 @@ dependencies = [
     "gdal",
     "pdal",
     "pyproj",
-    "click"
+    "click",
+    "requests"
 ]
 
 [project.optional-dependencies]

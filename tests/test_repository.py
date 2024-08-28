@@ -16,8 +16,7 @@ def mock_temp_project(tmp_path, monkeypatch):
 
 @pytest.fixture(scope="function")
 def repo(mock_temp_project, mock_user_home):
-    repo = Repository()
-    repo.init()
+    repo = Repository(create=True)
     return repo
 
 
@@ -48,11 +47,18 @@ def test_remove_data(repo, wippolder_dir):
     assert repo.get_data(casespec) is None
 
 
-def test_empty(mock_temp_project):
+def test_empty(repo):
     """Can we create an empty repository?"""
-    repo = Repository()
-    repo.init()
-    print(repo)
+    assert repo.path.exists()
+
+
+def test_init_from_url(mock_temp_project):
+    repo = Repository(path="https://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot")
+    assert repo.path.exists()
+    assert repo.path_index.exists()
+    assert repo.path_cases.exists()
+    assert repo.path_config_local.exists()
+    assert repo.get_case(CaseSpec(case_name="wippolder", data_name=None)) is not None
 
 
 def test_index_serialize(repo, wippolder_dir):

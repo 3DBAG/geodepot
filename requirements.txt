@@ -2,6 +2,7 @@ gdal
 pdal
 pyproj
 click
+requests
 # Dev
 pytest
 pyinstaller
