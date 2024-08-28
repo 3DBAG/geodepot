@@ -8,17 +8,15 @@ from geodepot.data import Data, DataName
 CaseName = NewType("CaseName", str)
 
 
-@dataclass
+@dataclass(repr=True)
 class CaseSpec:
     """Case specifier."""
 
     case_name: CaseName | None = None
     data_name: DataName | None = None
 
-    @classmethod
-    def from_str(cls, casespec: str) -> Self:
-        """Parse the case specifier."""
-        return CaseSpec(*casespec.split("/"))
+    def __str__(self):
+        return f"{self.case_name}/{self.data_name}"
 
     def to_path(self) -> Path:
         if self.case_name is not None and self.data_name is not None:
@@ -27,6 +25,11 @@ class CaseSpec:
             return Path(self.case_name)
         else:
             Path()
+
+    @classmethod
+    def from_str(cls, casespec: str) -> Self:
+        """Parse the case specifier."""
+        return CaseSpec(*casespec.split("/"))
 
 
 @dataclass(repr=True, order=True)

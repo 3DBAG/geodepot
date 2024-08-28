@@ -230,7 +230,8 @@ geodepot get <casespec>
 
 **Description**
 
-Return the full path to the specified data entry of the specified case.
+Return the full local path to the specified data item of the specified case.
+If the data item does not exist locally and a remote repository is configured, the data will be downloaded from the remote.
 
 **Options**
 
@@ -664,10 +665,10 @@ git lfs could be sth to use, but maybe overkill because need to set up and opera
 
 ## TODOs
 
+- Sanitize serialize/write_to_file etc.
 - Check again that driver detection works
 - Test with adding `pickle`
 - Add option for providing bbox to `add`
-- How to record the changing User when only the case description
 - Add driver to index
 - Find out diver from format
 - Try building wheels for the deps, so that geodepot is pip-installable

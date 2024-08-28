@@ -167,3 +167,9 @@ def test_add_license_data(repo, wippolder_dir):
     df_updated = repo.get_data(CaseSpec("wippolder", "wippolder.gpkg"))
     assert df_old.license is None
     assert df_updated.license == "CC-0"
+
+def test_get_remote(mock_temp_project):
+    """Can we get a data item from the remote repository?"""
+    repo = Repository(path="https://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot")
+    data_path = repo.get_data_path(CaseSpec("wippolder", "wippolder.gpkg"))
+    assert data_path.exists()

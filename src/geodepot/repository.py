@@ -4,8 +4,9 @@ from logging import getLogger
 from pathlib import Path
 from shutil import copy2, copytree, rmtree
 from typing import Self, Any
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urlparse
 
+import requests
 from osgeo.ogr import (
     UseExceptions,
     GetDriverByName,
@@ -20,10 +21,14 @@ from osgeo.ogr import (
 from osgeo.osr import SpatialReference
 from requests import get as requests_get
 
-from geodepot import GEODEPOT_CONFIG_LOCAL, GEODEPOT_INDEX, GEODEPOT_INDEX_EPSG, \
-    GEODEPOT_CASES
+from geodepot import (
+    GEODEPOT_CONFIG_LOCAL,
+    GEODEPOT_INDEX,
+    GEODEPOT_INDEX_EPSG,
+    GEODEPOT_CASES,
+)
 from geodepot.case import CaseName, Case, CaseSpec
-from geodepot.config import Config, get_current_user, User
+from geodepot.config import Config, get_current_user, User, get_config, Remote
 from geodepot.data import Data
 from geodepot.errors import GeodepotRuntimeError, GeodepotInvalidRepository
 
@@ -258,73 +263,22 @@ class Index:
             )
         return diff_all
 
+
 def is_url(path: str) -> bool:
-    return path.startswith("http") or path.startswith("https") or path.startswith("ftp") or path.startswith("sftp") or path.startswith("ssh")
+    return (
+        path.startswith("http")
+        or path.startswith("https")
+        or path.startswith("ftp")
+        or path.startswith("sftp")
+        or path.startswith("ssh")
+    )
+
 
 @dataclass(repr=True, init=False)
 class Repository:
     path: Path = field(default_factory=lambda: Path.cwd() / ".geodepot")
     index: Index | None = None
-
-    def __new_at_path(self, path: Path):
-        self.path = path
-        self.path.mkdir()
-        self.path_cases.mkdir()
-        self.index = Index()
-        self.index.serialize(self.path_index)
-        Config().write_to_file(self.path_config_local)
-        logger.info(f"Empty geodepot repository created at {self.path}")
-
-    def __load_from_path(self, path: Path):
-        self.path = path
-        self.load_index()
-        if not self.path_cases.is_dir():
-            raise GeodepotInvalidRepository(f"cases directory {self.path_cases} does not exist")
-        if not self.path_config_local.is_file():
-            raise GeodepotInvalidRepository(f"local config {self.path_config_local} does not exist")
-        logger.info(f"Loaded existing geodepot repository at {self.path}")
-
-    def __init__(self, path: str | None = None, create: bool = False):
-        if path is None:
-            # We are in the current working directory
-            path_local = Path.cwd() / ".geodepot"
-            # Get existing repository
-            if path_local.exists():
-                self.__load_from_path(path_local)
-            elif create:
-                # Create new repository
-                self.__new_at_path(path=path_local)
-            else:
-                raise GeodepotInvalidRepository(f"Geodepot repository does not exist at {path_local}")
-        elif isinstance(path, str):
-            if is_url(path):
-                path_local = Path.cwd() / ".geodepot"
-                if path_local.is_dir():
-                    raise GeodepotRuntimeError(f"Geodepot repository already exists at {path_local}, use the 'pull' command to update the local repository with the remote contents.")
-                else:
-                    path_local.joinpath(GEODEPOT_CASES).mkdir(parents=True)
-                url_root = urlparse(path).geturl()
-                # Download existing repository
-                response = requests_get("/".join([url_root, GEODEPOT_INDEX]))
-                response.raise_for_status()
-                path_local.joinpath(GEODEPOT_INDEX).write_bytes(response.content)
-                response = requests_get("/".join([url_root, GEODEPOT_CONFIG_LOCAL]))
-                response.raise_for_status()
-                path_local.joinpath(GEODEPOT_CONFIG_LOCAL).write_bytes(response.content)
-                self.__load_from_path(path_local)
-            else:
-                p = Path(path).resolve()
-                if p.is_dir() and p.name == ".geodepot":
-                    self.__load_from_path(p)
-                elif create:
-                    # Create new repository
-                    path_local = Path(path) / ".geodepot"
-                    self.__new_at_path(path=path_local)
-                else:
-                    raise GeodepotInvalidRepository(f"Geodepot repository does not exist at {p}")
-        else:
-            raise TypeError("Path must be a string or None")
-
+    config: Config | None = None
 
     @property
     def path_cases(self):
@@ -337,6 +291,66 @@ class Repository:
     @property
     def path_config_local(self):
         return self.path / GEODEPOT_CONFIG_LOCAL
+
+    def __init__(self, path: str | None = None, create: bool = False):
+        if path is None:
+            # We are in the current working directory
+            path_local = Path.cwd() / ".geodepot"
+            # Get existing repository
+            if path_local.exists():
+                self._load_from_path(path_local)
+            elif create:
+                # Create new repository
+                self._new_at_path(path=path_local)
+            else:
+                raise GeodepotInvalidRepository(
+                    f"Geodepot repository does not exist at {path_local}"
+                )
+        elif isinstance(path, str):
+            if is_url(path):
+                if create:
+                    raise GeodepotRuntimeError(
+                        "Geodepot does not support creating remote repositories (cannot set 'path' to a URL and 'create=True')."
+                    )
+                path_local = Path.cwd() / ".geodepot"
+                if path_local.is_dir():
+                    raise GeodepotRuntimeError(
+                        f"Geodepot repository already exists at {path_local}, use the 'pull' command to update the local repository with the remote contents."
+                    )
+                else:
+                    path_local.joinpath(GEODEPOT_CASES).mkdir(parents=True)
+                url_root = urlparse(path).geturl()
+                # Download existing repository
+                response = requests_get("/".join([url_root, GEODEPOT_INDEX]))
+                response.raise_for_status()
+                path_local.joinpath(GEODEPOT_INDEX).write_bytes(response.content)
+                response = requests_get("/".join([url_root, GEODEPOT_CONFIG_LOCAL]))
+                response.raise_for_status()
+                config = Config.from_json(response.content)
+                if "origin" not in config.remotes:
+                    remote_origin = Remote(name="origin", url=url_root)
+                    config.remotes["origin"] = remote_origin
+                    config.write_to_file(path_local.joinpath(GEODEPOT_CONFIG_LOCAL))
+                    logger.debug(f"Added {remote_origin} to config.remotes")
+                self._load_from_path(path_local)
+            else:
+                p = Path(path).resolve()
+                if p.is_dir() and p.name == ".geodepot":
+                    self._load_from_path(p)
+                elif create:
+                    # Create new repository
+                    path_local = Path(path) / ".geodepot"
+                    self._new_at_path(path=path_local)
+                else:
+                    raise GeodepotInvalidRepository(
+                        f"Geodepot repository does not exist at {p}"
+                    )
+        else:
+            raise TypeError("Path must be a string or None")
+
+    def load_config(self):
+        """Load the configuration."""
+        self.config = get_config()
 
     def load_index(self):
         """Load the index."""
@@ -425,19 +439,57 @@ class Repository:
         self.path_cases.joinpath(casespec.case_name).mkdir()
         return self.get_case(casespec)
 
-    def get_data(self, casespec: CaseSpec) -> Data | None:
-        """Retrieve an existing data entry.
-        Return None if the data entry does not exist."""
-        if (case := self.get_case(casespec)) is not None:
-            if casespec.data_name is not None:
-                return case.get_data(casespec.data_name)
+    def get_data_path(self, casespec: CaseSpec) -> Path | None:
+        """Retrieve the full path to an existing data item.
+
+        If the data file does not exist locally, and a remote is configured, that
+        contains the file, then it will be downloaded.
+        """
+        if (_ := self.get_data(casespec)) is not None:
+            data_path = self.path_cases.joinpath(casespec.to_path())
+            if data_path.exists():
+                return data_path
+            else:
+                # Try downloading from remote
+                remote = self.config.remotes.get("origin")
+                if remote is not None:
+                    logger.debug(
+                        f"Did not find {casespec} locally, trying remote {remote}"
+                    )
+                    url_remote_data = "/".join(
+                        [remote.url, GEODEPOT_CASES, str(casespec)]
+                    )
+                    response = requests.get(url_remote_data)
+                    if response.status_code == 200:
+                        data_path.parent.mkdir(exist_ok=True)
+                        data_path.open("wb").write(response.content)
+                        logger.info(f"Downloaded {casespec} from remote '{remote}'")
+                        return data_path
+                    elif response.status_code == 404:
+                        pass
+                    else:
+                        response.raise_for_status()
+                else:
+                    logger.debug(
+                        f"Trying to download {casespec} from a remote, but the config does not contain a remote with name 'origin'."
+                    )
         logger.info(f"The entry {casespec} does not exist in the repository.")
         return None
 
-    def get_data_path(self, casespec: CaseSpec) -> Path | None:
-        """Retrieve the full path to an existing data entry."""
-        if (_ := self.get_data(casespec)) is not None:
-            return self.path_cases.joinpath(casespec.to_path())
+    def get_data(self, casespec: CaseSpec) -> Data | None:
+        """Retrieve an existing data item.
+
+        Return `None` if the data does not exist, or `casespec` does not specify a
+        `data_name`.
+        """
+        if casespec.data_name is None:
+            logger.error(
+                f"Must specify data_name in {casespec} for getting a data item."
+            )
+            return None
+        case = self.get_case(casespec)
+        if case is not None:
+            return case.get_data(casespec.data_name)
         logger.info(f"The entry {casespec} does not exist in the repository.")
         return None
 
@@ -497,6 +549,30 @@ class Repository:
                 logger.info(
                     f"The case {casespec.case_name} does not exist in the repository"
                 )
+
+    def _new_at_path(self, path: Path):
+        self.path = path
+        self.path.mkdir()
+        self.path_cases.mkdir()
+        self.index = Index()
+        self.index.serialize(self.path_index)
+        self.config = Config()
+        self.config.write_to_file(self.path_config_local)
+        logger.info(f"Empty geodepot repository created at {self.path}")
+
+    def _load_from_path(self, path: Path):
+        self.path = path
+        self.load_index()
+        self.load_config()
+        if not self.path_cases.is_dir():
+            raise GeodepotInvalidRepository(
+                f"cases directory {self.path_cases} does not exist"
+            )
+        if not self.path_config_local.is_file():
+            raise GeodepotInvalidRepository(
+                f"local config {self.path_config_local} does not exist"
+            )
+        logger.info(f"Loaded existing geodepot repository at {self.path}")
 
 
 def parse_pathspec(pathspec: str, as_data: bool = False) -> list[Path]:

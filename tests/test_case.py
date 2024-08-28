@@ -14,7 +14,7 @@ from geodepot.data import Data
         ("wippolder", CaseSpec(case_name="wippolder")),
     ),
 )
-def test_casespec(casespec, expected):
+def test_casespec_from_str(casespec, expected):
     """Can we parse the case specifier?"""
     assert CaseSpec.from_str(casespec) == expected
 

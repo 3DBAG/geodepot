@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from json import dumps, load, JSONEncoder
+from json import dumps, load, loads, JSONEncoder
 from logging import getLogger
 from pathlib import Path
 from typing import Self
@@ -43,6 +43,9 @@ class Remote:
     name: str
     url: str
 
+    def __str__(self):
+        return f"{self.name} {self.url}"
+
     def to_json(self) -> str:
         return dumps(self, cls=DataClassEncoder, indent=JSON_INDENT)
 
@@ -57,7 +60,7 @@ def as_remote(dct: dict) -> Remote | dict:
 @dataclass(repr=True)
 class Config:
     user: User | None = None
-    remotes: list[Remote] | None = None
+    remotes: dict[str, Remote] | None = None
 
     @classmethod
     def read_from_file(cls, path: Path) -> Self:
@@ -72,6 +75,10 @@ class Config:
     def write_to_file(self, path: Path) -> None:
         logger.debug(f"Writing config to file: {path}")
         path.write_text(self.to_json())
+
+    @classmethod
+    def from_json(cls, json_str) -> Self:
+        return loads(json_str, object_hook=as_config)
 
     def to_json(self) -> str:
         return dumps(self, cls=config_encoder, indent=JSON_INDENT)
@@ -95,10 +102,10 @@ def as_config(dct: dict) -> Config | dict:
     if (usr := dct.get("user")) is not None:
         user = as_user(usr)
     if (rmt := dct.get("remotes")) is not None:
-        remotes = [
-            as_remote({"name": remote_name, **remote})
+        remotes = {
+            remote_name: as_remote({"name": remote_name, **remote})
             for remote_name, remote in rmt.items()
-        ]
+        }
     if user is None and remotes is None:
         return dct
     else:
@@ -151,6 +158,11 @@ def get_local_config() -> Config | None:
 
 
 def get_config() -> Config:
+    """Load the Geoflow configuration.
+
+    The local configuration is merged into the global configuration, so that local
+    values overwrite global values.
+    """
     config = get_global_config()
     local_config = get_local_config()
     if config is None and local_config is None:
