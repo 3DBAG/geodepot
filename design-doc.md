@@ -181,9 +181,7 @@ the commands that have the same name as in git, but do sth different are confusi
 - [pull](#pull)
 - [push](#push)
 - [verify](#verify)
-- [-] [remote](#remote-list)
-- [-] [remote add](#remote-add)
-- [-] [remote remove](#remote-remove)
+- [x] [remote](#remote-list)
 - [snapshot](#snapshot-list)
 - [snapshot save](#snapshot-save)
 - [snapshot load](#snapshot-load)
@@ -191,7 +189,44 @@ the commands that have the same name as in git, but do sth different are confusi
 
 #### config
 
-Configure Geodepot.
+**Synopsis**
+
+```shell
+geodepot config list
+geodepot config get [--global] <name>
+geodepot config set [--global] <name> <value>
+```
+
+**Description**
+
+You can query or set options with this command. 
+The `name` is actually the section and the key separated by a dot, and the `value` will be escaped.
+
+**Commands**
+
+`list`: 
+List all variables set in the config files, along with their values.
+
+`get`:
+Emits the value of the specified key. If key is present multiple times in the configuration, emits the last value.
+
+`set`:
+Set value for one config options.
+
+
+**Options**
+
+`--global`:
+For writing options: write to the global `~/.geodepotconfig` file rather than the repository `.geodepot/config`.
+
+For reading options: read only from the global `~/.geodepotconfig` file rather than the repository `.geodepot/config`.
+
+**Examples**
+
+```shell
+geodepot config add --global user.name "Kovács János"
+geodepot config add --global user.email janos@kovacs.me
+```
 
 #### init
 
@@ -216,7 +251,7 @@ The data needs to be `pull`-ed explicitly after the repository has been initiali
 
 List the cases in the repository.
 
-#### show <case-id>
+#### show
 
 Show the details of the specified case.
 
@@ -238,6 +273,14 @@ If the data item does not exist locally and a remote repository is configured, t
 `<casespec>`:
 Case (and data) specifier, in the form of `case-name/data-name`.
 For example, `wippolder/wippolder.gpkg`, where `wippolder` is the case name, `wippolder.gpkg` is the data name.
+
+**Examples**
+
+Get the full local path to the data item `wippolder/wippolder.gpkg`.
+
+```shell
+geodepot get wippolder/wippolder.gpkg
+```
 
 #### add
 
@@ -350,15 +393,34 @@ With the remote name as argument, it verifies the remote repository.
 
 #### remote
 
-With no arguments, shows the existing remotes.
+**Synopsis**
 
-#### remote add
+```shell
+geodepot remote list
+geodepot remote add <name> <url>
+geodepot remote remove <name>
+```
 
+**Description**
+
+Connect an existing remote Geodepot repository.
+
+**Commands**
+
+`list`:
+List the available remote repositories.
+
+`add`: 
 Add a remote repository to track. The remote repository must exist.
 
-#### remote remove
-
+`remove`: 
 Remove the remote from the tracked remotes. The remote repository is not deleted.
+
+**Examples**
+
+```shell
+geodepot remote add origin https://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot
+```
 
 #### snapshot
 
