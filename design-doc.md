@@ -311,6 +311,7 @@ geodepot add [-y] [--license=<text>] [--description=<text>] [--format=<format>] 
 
 **Description**
 
+Add or update a case or a data item.
 In each operation, the case will be created if it does not exist.
 In each operation, existing values, data files are updated with the newly provided.
 

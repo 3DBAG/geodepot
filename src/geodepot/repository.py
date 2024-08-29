@@ -78,6 +78,7 @@ class Index:
             OGRERR_NONE,
         )
         from osgeo.osr import SpatialReference
+
         try:
             INDEX_SRS = SpatialReference()
             INDEX_SRS.ImportFromEPSG(GEODEPOT_INDEX_EPSG)
@@ -151,6 +152,7 @@ class Index:
             logger.critical(f"Index path {path} does not exist")
             return None
         from osgeo.ogr import GetDriverByName
+
         cases_in_index = {}
         try:
             with GetDriverByName("GeoJSON").Open(path) as ds:
@@ -316,6 +318,7 @@ class Repository:
                         "Geodepot does not support creating remote repositories (cannot set 'path' to a URL and 'create=True')."
                     )
                 from requests import get as requests_get
+
                 path_local = Path.cwd() / ".geodepot"
                 if path_local.is_dir():
                     raise GeodepotRuntimeError(
@@ -346,9 +349,7 @@ class Repository:
                     path_local = Path(path) / ".geodepot"
                     self._new_at_path(path=path_local)
                 else:
-                    raise GeodepotInvalidRepository(
-                        f"Not a Geodepot repository ({p})."
-                    )
+                    raise GeodepotInvalidRepository(f"Not a Geodepot repository ({p}).")
         else:
             raise TypeError("Path must be a string or None")
 
@@ -428,6 +429,7 @@ class Repository:
                 )
                 self.copy_data(p, casespec)
                 logger.info(f"Added {data.name} to {case.name}")
+                logger.debug(data.to_pretty())
         self.index.add_case(case)
         self.write_index()
         logger.debug(f"Serialized the index to {self.path_index}")
@@ -456,6 +458,7 @@ class Repository:
             else:
                 # Try downloading from remote
                 from requests import get as requests_get
+
                 remote = self.config.remotes.get("origin")
                 if remote is not None:
                     logger.debug(

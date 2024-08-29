@@ -11,8 +11,13 @@ from click import (
 )
 
 from geodepot.case import CaseSpec
-from geodepot.config import config_list, configure, remote_list, get_config, Remote, \
-    remote_add, remote_remove
+from geodepot.config import (
+    config_list,
+    configure,
+    remote_list,
+    remote_add,
+    remote_remove,
+)
 from geodepot.errors import GeodepotInvalidRepository
 from geodepot.repository import Repository
 
@@ -20,8 +25,9 @@ from geodepot.repository import Repository
 @group()
 @version_option()
 @option(
-    "--verbose/--no-verbose",
+    "--verbose",
     " /-v",
+    is_flag=True,
     default=False,
     help="Be verbose in reporting the progress.",
 )
@@ -33,10 +39,38 @@ def geodepot_grp(ctx, verbose):
     ctx.obj["logger"] = getLogger(__name__)
 
 
-@command(name="add")
+@command(name="add", help="Add or update a case or a data item.")
+@argument("casespec")
+@argument("path", required=False, nargs=-1, type=str)
+@option("--license", "data_license", help="A license to add to the data.")
+@option("--description", help="A description to add to the case or data.")
+@option(
+    "--format",
+    "data_format",
+    help="A format to force on the data in case it cannot be inferred automatically, or the inferred format is not correct.",
+)
+@option("--as-data", is_flag=True, default=False, help="Add a whole directory as a single data entry.")
 @pass_context
-def add_cmd(ctx):
+def add_cmd(ctx, casespec, path, data_license, description, data_format, as_data):
     repo = get_repository(ctx)
+    if path is not None:
+        for p in path:
+            repo.add(
+                casespec=casespec,
+                pathspec=p,
+                license=data_license,
+                description=description,
+                format=data_format,
+                as_data=as_data,
+            )
+    else:
+        repo.add(
+            casespec=casespec,
+            license=data_license,
+            description=description,
+            format=data_format,
+            as_data=as_data,
+        )
 
 
 @group(name="config", help="Query or set configuration options.")
@@ -147,7 +181,10 @@ def remote_list_cmd(ctx):
         ctx.obj["logger"].info("\n" + "\n".join(output))
 
 
-@remote_grp.command(name="add", help="Add a remote repository to track. The remote repository must exist.")
+@remote_grp.command(
+    name="add",
+    help="Add a remote repository to track. The remote repository must exist.",
+)
 @argument("name")
 @argument("url")
 @pass_context
@@ -155,7 +192,10 @@ def remote_add_cmd(ctx, name, url):
     remote_add(name, url)
 
 
-@remote_grp.command(name="remove", help="Remove the remote from the tracked remotes. The remote repository is not deleted.")
+@remote_grp.command(
+    name="remove",
+    help="Remove the remote from the tracked remotes. The remote repository is not deleted.",
+)
 @argument("name")
 @pass_context
 def remote_remove_cmd(ctx, name):
