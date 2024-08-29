@@ -212,3 +212,6 @@ geodepot_grp.add_command(remote_grp)
 geodepot_grp.add_command(remove_cmd)
 geodepot_grp.add_command(show_cmd)
 geodepot_grp.add_command(verify_cmd)
+
+if __name__ == "__main__":
+    geodepot_grp()

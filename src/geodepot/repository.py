@@ -6,20 +6,7 @@ from shutil import copy2, copytree, rmtree
 from typing import Self, Any
 from urllib.parse import urlparse
 
-import requests
-from osgeo.ogr import (
-    UseExceptions,
-    GetDriverByName,
-    FieldDefn,
-    FeatureDefn,
-    OFTString,
-    OFTInteger64,
-    wkbPolygon,
-    Feature,
-    OGRERR_NONE,
-)
-from osgeo.osr import SpatialReference
-from requests import get as requests_get
+from osgeo.ogr import UseExceptions
 
 from geodepot import (
     GEODEPOT_CONFIG_LOCAL,
@@ -80,6 +67,17 @@ class Index:
         return self.cases.pop(case_name, None)
 
     def serialize(self, path: Path):
+        from osgeo.ogr import (
+            GetDriverByName,
+            FieldDefn,
+            FeatureDefn,
+            OFTString,
+            OFTInteger64,
+            wkbPolygon,
+            Feature,
+            OGRERR_NONE,
+        )
+        from osgeo.osr import SpatialReference
         try:
             INDEX_SRS = SpatialReference()
             INDEX_SRS.ImportFromEPSG(GEODEPOT_INDEX_EPSG)
@@ -152,6 +150,7 @@ class Index:
         if not path.exists():
             logger.critical(f"Index path {path} does not exist")
             return None
+        from osgeo.ogr import GetDriverByName
         cases_in_index = {}
         try:
             with GetDriverByName("GeoJSON").Open(path) as ds:
@@ -316,6 +315,7 @@ class Repository:
                     raise GeodepotRuntimeError(
                         "Geodepot does not support creating remote repositories (cannot set 'path' to a URL and 'create=True')."
                     )
+                from requests import get as requests_get
                 path_local = Path.cwd() / ".geodepot"
                 if path_local.is_dir():
                     raise GeodepotRuntimeError(
@@ -455,6 +455,7 @@ class Repository:
                 return data_path
             else:
                 # Try downloading from remote
+                from requests import get as requests_get
                 remote = self.config.remotes.get("origin")
                 if remote is not None:
                     logger.debug(
@@ -463,7 +464,7 @@ class Repository:
                     url_remote_data = "/".join(
                         [remote.url, GEODEPOT_CASES, str(casespec)]
                     )
-                    response = requests.get(url_remote_data)
+                    response = requests_get(url_remote_data)
                     if response.status_code == 200:
                         data_path.parent.mkdir(exist_ok=True)
                         data_path.open("wb").write(response.content)

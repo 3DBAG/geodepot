@@ -6,18 +6,8 @@ from logging import getLogger
 from pathlib import Path
 from typing import NewType, Self
 
-from osgeo.gdal import OpenEx as gdalOpenEx, UseExceptions as gdalUseExceptions
-from osgeo.ogr import (
-    Open as ogrOpen,
-    UseExceptions as ogrUseExceptions,
-    Geometry,
-    wkbPolygon,
-    wkbLinearRing,
-    Feature,
-    CreateGeometryFromWkt,
-)
-from osgeo.osr import SpatialReference, CreateCoordinateTransformation
-from pdal import Reader, Pipeline
+from osgeo.gdal import UseExceptions as gdalUseExceptions
+from osgeo.ogr import UseExceptions as ogrUseExceptions
 
 from geodepot import GEODEPOT_INDEX_EPSG
 from geodepot.config import User
@@ -48,8 +38,9 @@ class BBox:
     maxx: float
     maxy: float
 
-    def to_ogr_geometry_wkbpolygon(self) -> Geometry:
+    def to_ogr_geometry_wkbpolygon(self):
         """Convert to an OGR Geometry that is a wkbPolygon."""
+        from osgeo.ogr import Geometry, wkbPolygon, wkbLinearRing
         ring = Geometry(wkbLinearRing)
         ring.AddPoint_2D(self.minx, self.miny)
         ring.AddPoint_2D(self.maxx, self.miny)
@@ -143,6 +134,7 @@ class Data:
         raise ValueError(f"Cannot determine format of {path}")
 
     def _compute_bbox(self, path: Path) -> BBoxSRS:
+        from osgeo.osr import SpatialReference, CreateCoordinateTransformation
         target_epsg = GEODEPOT_INDEX_EPSG
         pseudo_mercator = SpatialReference()
         pseudo_mercator.ImportFromEPSG(target_epsg)
@@ -198,6 +190,7 @@ class Data:
                         f"Cannot compute bounding box for {path}, file does not contain a 'vertices' member"
                     )
         elif self.driver == Drivers.GDAL:
+            from osgeo.gdal import OpenEx as gdalOpenEx
             with gdalOpenEx(path) as gdal_dataset:
                 bbox_srs = BBoxSRS()
                 srs = gdal_dataset.GetSpatialRef()
@@ -234,6 +227,7 @@ class Data:
                     )
                 return bbox_srs
         elif self.driver == Drivers.OGR:
+            from osgeo.ogr import Open as ogrOpen
             with ogrOpen(path) as ogr_dataset:
                 lyr = ogr_dataset.GetLayer(0)
                 srs = lyr.GetSpatialRef()
@@ -260,6 +254,7 @@ class Data:
                     )
                 return bbox_srs
         elif self.driver == Drivers.PDAL:
+            from pdal import Pipeline
             pdal_pipeline = Pipeline(dumps([str(path), pdal_filter_stats]))
             pdal_pipeline.execute()
             stats = pdal_pipeline.metadata["metadata"]["filters.stats"]["statistic"]
@@ -291,7 +286,8 @@ class Data:
             raise ValueError(f"Unknown driver: {self.driver}")
 
     @classmethod
-    def from_ogr_feature(cls, feature: Feature) -> Self:
+    def from_ogr_feature(cls, feature) -> Self:
+        from osgeo.ogr import CreateGeometryFromWkt
         df = cls.__new__(cls)
         df.name = DataName(feature["data_name"])
         df.sha1 = feature["data_sha1"]
@@ -329,6 +325,7 @@ class Data:
 
 
 def try_pdal(path: Path) -> str | None:
+    from pdal import Reader
     try:
         reader = Reader(path)
         if reader.type is not None and reader.type != "":
@@ -340,6 +337,7 @@ def try_pdal(path: Path) -> str | None:
 
 
 def try_ogr(path: Path) -> str | None:
+    from osgeo.ogr import Open as ogrOpen
     try:
         with ogrOpen(path) as ogr_dataset:
             return ogr_dataset.GetDriver().GetName()
@@ -348,6 +346,7 @@ def try_ogr(path: Path) -> str | None:
 
 
 def try_gdal(path: Path) -> str | None:
+    from osgeo.gdal import OpenEx as gdalOpenEx
     try:
         with gdalOpenEx(path) as gdal_dataset:
             lname = gdal_dataset.GetDriver().LongName
