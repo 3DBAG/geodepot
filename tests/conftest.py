@@ -1,3 +1,4 @@
+from os import rmdir
 from pathlib import Path
 
 import pytest
@@ -35,3 +36,11 @@ def monkeysession():
 @pytest.fixture(scope="session", autouse=True)
 def mock_proj_lib(monkeysession, data_dir):
     monkeysession.setenv("PROJ_LIB", data_dir)
+
+
+@pytest.fixture(scope="function")
+def mock_temp_project(tmp_path, monkeypatch):
+    def mockreturn():
+        return tmp_path
+
+    monkeypatch.setattr(Path, "cwd", mockreturn)

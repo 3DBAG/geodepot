@@ -6,14 +6,6 @@ from geodepot.data import DataName
 from geodepot.repository import *
 
 
-@pytest.fixture
-def mock_temp_project(tmp_path, monkeypatch):
-    def mockreturn():
-        return tmp_path
-
-    monkeypatch.setattr(Path, "cwd", mockreturn)
-
-
 @pytest.fixture(scope="function")
 def repo(mock_temp_project, mock_user_home):
     repo = Repository(create=True)

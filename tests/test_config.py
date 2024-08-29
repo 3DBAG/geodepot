@@ -1,6 +1,7 @@
 import pytest
 
 from geodepot.config import *
+from geodepot.repository import Repository
 
 
 @pytest.mark.parametrize(
@@ -18,7 +19,7 @@ from geodepot.config import *
             },
             Config(
                 user=User(name="myname", email="<EMAIL>"),
-                remotes=[Remote(name="myremote", url="myurl")],
+                remotes={"myremote": Remote(name="myremote", url="myurl")},
             ),
         ),
     ),
@@ -35,7 +36,7 @@ def test_read_global_config(mock_user_home):
 
 def test_read_local_config(mock_project_dir):
     config = get_local_config()
-    assert config.remotes[0].name == "remote-name"
+    assert config.remotes["remote-name"].name == "remote-name"
 
 
 @pytest.mark.parametrize(
@@ -48,10 +49,10 @@ def test_read_local_config(mock_project_dir):
         ),
         (
             Config(user=User(name="name", email="email")),
-            Config(remotes=[Remote(name="remote-name", url="url")]),
+            Config(remotes={"remote-name": Remote(name="remote-name", url="url")}),
             Config(
                 user=User(name="name", email="email"),
-                remotes=[Remote(name="remote-name", url="url")],
+                remotes={"remote-name": Remote(name="remote-name", url="url")},
             ),
         ),
     ),
@@ -86,6 +87,14 @@ def test_configure_set(mock_user_home, mock_project_dir):
     config = get_global_config()
     assert config.user.name == "My Name"
     configure(key="user.name", value=oldval, global_config=True)
+
+def test_configure_set_new(mock_temp_project):
+    Repository(create=True)
+    configure(key="user.name", value="My Name")
+    configure(key="user.email", value="email")
+    config = get_local_config()
+    assert config.user.name == "My Name"
+    assert config.user.email == "email"
 
 def test_configure_get(mock_user_home, mock_project_dir):
     val = configure(key="user.name",  global_config=True)

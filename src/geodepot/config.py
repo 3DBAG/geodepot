@@ -14,8 +14,8 @@ JSON_INDENT = 2
 
 @dataclass(repr=True)
 class User:
-    name: str
-    email: str
+    name: str | None = None
+    email: str | None = None
 
     def to_json(self) -> str:
         return dumps(self, cls=DataClassEncoder, indent=JSON_INDENT)
@@ -70,7 +70,7 @@ class Config:
             # An empty config is serialized as an empty JSON object '{}', so the
             # deserializer 'as_config' will return a dict and not an empty Config
             # instance.
-            return c if not isinstance(c, dict) else cls()
+            return c if not isinstance(c, dict) else Config(user=User(), remotes=dict())
 
     def write_to_file(self, path: Path) -> None:
         logger.debug(f"Writing config to file: {path}")
@@ -96,6 +96,19 @@ class Config:
     def remove_remote(self, name: str):
         del self.remotes[name]
 
+    def to_pretty_lines(self) -> list[str]:
+        """Format the configuration values to a list of pretty formatted strings."""
+        pretty_strings = []
+        if self.user is not None:
+            if self.user.name is not None:
+                pretty_strings.append(f"user.name={self.user.name}")
+            if self.user.email is not None:
+                pretty_strings.append(f"user.email={self.user.email}")
+        if self.remotes is not None:
+            for name in self.remotes:
+                if self.remotes[name].url is not None:
+                    pretty_strings.append(f"remote.{name}.url={self.remotes[name].url}")
+        return pretty_strings
 
 def as_config(dct: dict) -> Config | dict:
     """Deserialize a dict as a Config instance.
@@ -204,3 +217,37 @@ def configure(key: str, value: str | None = None, global_config: bool = False) -
         logger.debug(f"Set {key} to {value} (global={global_config})")
     config_path = get_global_config_path() if global_config else get_local_config_path()
     config.write_to_file(config_path)
+
+
+def config_list() -> list[str]:
+    output = []
+    config_global = get_global_config()
+    config_local = get_local_config()
+    if config_global is not None:
+        for line in config_global.to_pretty_lines():
+            output.append(f"[global] {line}")
+    if config_local is not None:
+        for line in config_local.to_pretty_lines():
+            output.append(f"[local] {line}")
+    return output
+
+
+def remote_list() -> list[str]:
+    output = []
+    config = get_config()
+    if config is not None:
+        for k, v in config.remotes.items():
+            output.append(f"{k} {v.url}")
+    return output
+
+
+def remote_add(name: str, url: str):
+    config = get_local_config()
+    config.add_remote(name, url)
+    config.write_to_file(get_local_config_path())
+
+
+def remote_remove(name: str):
+    config = get_local_config()
+    config.remove_remote(name)
+    config.write_to_file(get_local_config_path())

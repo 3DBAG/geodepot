@@ -292,6 +292,10 @@ class Repository:
     def path_config_local(self):
         return self.path / GEODEPOT_CONFIG_LOCAL
 
+    @property
+    def cases(self):
+        return self.index.cases
+
     def __init__(self, path: str | None = None, create: bool = False):
         if path is None:
             # We are in the current working directory
@@ -304,7 +308,7 @@ class Repository:
                 self._new_at_path(path=path_local)
             else:
                 raise GeodepotInvalidRepository(
-                    f"Geodepot repository does not exist at {path_local}"
+                    f"Not a Geodepot repository ({path_local})."
                 )
         elif isinstance(path, str):
             if is_url(path):
@@ -343,7 +347,7 @@ class Repository:
                     self._new_at_path(path=path_local)
                 else:
                     raise GeodepotInvalidRepository(
-                        f"Geodepot repository does not exist at {p}"
+                        f"Not a Geodepot repository ({p})."
                     )
         else:
             raise TypeError("Path must be a string or None")
@@ -558,7 +562,7 @@ class Repository:
         self.index.serialize(self.path_index)
         self.config = Config()
         self.config.write_to_file(self.path_config_local)
-        logger.info(f"Empty geodepot repository created at {self.path}")
+        logger.info(f"Initialized empty Geodepot repository at {self.path}")
 
     def _load_from_path(self, path: Path):
         self.path = path
@@ -572,7 +576,7 @@ class Repository:
             raise GeodepotInvalidRepository(
                 f"local config {self.path_config_local} does not exist"
             )
-        logger.info(f"Loaded existing geodepot repository at {self.path}")
+        logger.debug(f"Loaded existing geodepot repository at {self.path}")
 
 
 def parse_pathspec(pathspec: str, as_data: bool = False) -> list[Path]:

@@ -65,6 +65,11 @@ class Case:
         self.changed_by = get_current_user()
         return self.data.pop(name, None)
 
+    def to_pretty(self) -> str:
+        output = [f"{self.name}", f"\n{self.description}", f"\nnr_data={len(self.data)}",
+                  f"sha1={self.sha1}", f"changed_by={self.changed_by.to_pretty()}"]
+        return "\n".join(output)
+
     def compress(self):
         raise NotImplementedError
 

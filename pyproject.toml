@@ -27,5 +27,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest", "pyinstaller", "black", "isort"]
 
+[project.scripts]
+geodepot = "geodepot:cli.geodepot_grp"
+
 [tool.isort]
 profile = "black"

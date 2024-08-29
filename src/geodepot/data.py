@@ -108,27 +108,27 @@ class Data:
         self.driver = None
         self.bbox = None
         if path.is_file():
-            self.sha1 = self.__compute_sha1(path)
+            self.sha1 = self._compute_sha1(path)
             if data_format is None:
-                self.driver, self.format = self.__infer_format(path)
+                self.driver, self.format = self._infer_format(path)
                 if self.driver is None:
                     logger.error(
                         f"Could not determine the driver for the format {self.format} of {path}"
                     )
                 else:
-                    self.bbox = self.__compute_bbox(path)
+                    self.bbox = self._compute_bbox(path)
             else:
                 logger.info(
                     f"Forcing format {data_format} on {path}, won't be able to determine driver and compute the bounding box."
                 )
 
     @staticmethod
-    def __compute_sha1(path: Path) -> str:
+    def _compute_sha1(path: Path) -> str:
         with path.open("rb") as f:
             return file_digest(f, "sha1").hexdigest()
 
     @staticmethod
-    def __infer_format(path: Path) -> tuple[Drivers, str]:
+    def _infer_format(path: Path) -> tuple[Drivers, str]:
         """Try opening the file with different readers to determine its format."""
         if is_cityjson(path.suffixes):
             return Drivers.CITYJSON, "cityjson"
@@ -142,7 +142,7 @@ class Data:
             return Drivers.PDAL, pdal_format
         raise ValueError(f"Cannot determine format of {path}")
 
-    def __compute_bbox(self, path: Path) -> BBoxSRS:
+    def _compute_bbox(self, path: Path) -> BBoxSRS:
         target_epsg = GEODEPOT_INDEX_EPSG
         pseudo_mercator = SpatialReference()
         pseudo_mercator.ImportFromEPSG(target_epsg)
@@ -318,6 +318,14 @@ class Data:
             srs_wkt=feature["data_srs"],
         )
         return df
+
+    def to_pretty(self) -> str:
+        output = [f"{self.name}", f"\n{self.description}", f"\nformat={self.format}",
+                  f"driver={self.driver}", f"license={self.license}",
+                  f"sha1={self.sha1}", f"changed_by={self.changed_by.to_pretty()}",
+                  f"extent={self.bbox.bbox_original_srs.to_wkt()}",
+                  f"srs={self.bbox.srs_wkt}"]
+        return "\n".join(output)
 
 
 def try_pdal(path: Path) -> str | None:

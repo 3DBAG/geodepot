@@ -171,17 +171,20 @@ Support adding, viewing, modifying cases.
 
 the commands that have the same name as in git, but do sth different are confusing
 
-- [x] [config](#config)
-- [x] [init](#init)
-- [list](#list)
-- [show](#show)
-- [x] [get](#get)
 - [x] [add](#add)
-- [x] [remove](#remove)
+- [x] [config](#config)
+- [x] [get](#get)
+- [x] [init](#init)
+- [x] [list](#list)
 - [pull](#pull)
 - [push](#push)
-- [verify](#verify)
 - [x] [remote](#remote-list)
+- [x] [remove](#remove)
+- [x] [show](#show)
+- [verify](#verify)
+
+TBD:
+
 - [snapshot](#snapshot-list)
 - [snapshot save](#snapshot-save)
 - [snapshot load](#snapshot-load)
@@ -211,7 +214,7 @@ List all variables set in the config files, along with their values.
 Emits the value of the specified key. If key is present multiple times in the configuration, emits the last value.
 
 `set`:
-Set value for one config options.
+Set the value for one configuration option.
 
 
 **Options**
@@ -238,7 +241,7 @@ geodepot init [url]
 
 **Description**
 
-Initialise a geodepot repository in the current directory.
+Initialise a Geodepot repository in the current directory.
 
 **Options**
 
@@ -249,11 +252,27 @@ The data needs to be `pull`-ed explicitly after the repository has been initiali
 
 #### list
 
-List the cases in the repository.
+**Synopsis**
+
+```shell
+geodepot list
+```
+
+**Description**
+
+List the cases and data items in the repository.
 
 #### show
 
-Show the details of the specified case.
+**Synopsis**
+
+```shell
+geodepot show <casespec>
+```
+
+**Description**
+
+Show the details of the specified case or data.
 
 #### get
 
