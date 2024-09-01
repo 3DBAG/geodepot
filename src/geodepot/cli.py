@@ -220,11 +220,11 @@ def show_cmd(ctx, casespec):
     case = repo.get_case(cs)
     if case is not None:
         if cs.data_name is None:
-            ctx.obj["logger"].info(case.to_pretty())
+            ctx.obj["logger"].info("\n" + case.to_pretty())
         else:
             data = repo.get_data(cs)
             if data is not None:
-                ctx.obj["logger"].info(data.to_pretty())
+                ctx.obj["logger"].info("\n" + data.to_pretty())
 
 
 @command(name="verify")

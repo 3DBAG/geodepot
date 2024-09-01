@@ -61,14 +61,21 @@ def test_index_serialize(repo, wippolder_dir):
         description="wippolder case description",
         license="CC-0",
     )
-    repo.index.serialize(repo.path.joinpath("index.geojson"))
+    repo.index.write(repo.path.joinpath("index.geojson"))
     assert repo.path.joinpath("index.geojson").exists()
 
 
 def test_index_load(data_dir):
     """Can we deserialize the index?"""
-    index = Index.deserialize(data_dir / "test_index.geojson")
+    index = Index.load(data_dir / "test_index.geojson")
     assert CaseName("wippolder") in index.cases
+
+
+def test_index_load_remote(repo):
+    repo.config.add_remote("origin", "https://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot")
+    repo.load_index(remote=RemoteName("origin"))
+    assert repo.index_remote is not None
+    assert CaseName("wippolder") in repo.index_remote.cases
 
 
 def test_add_files(repo, wippolder_dir):

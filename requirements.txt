@@ -3,6 +3,7 @@ pdal
 pyproj
 click
 requests
+fabric
 # Dev
 pytest
 pyinstaller

@@ -200,3 +200,13 @@ def test_modify_data(case_wippolder, data_wippolder_gpkg, data_wippolder_gpkg_mo
     for d in diff_all:
         assert d.changed_by_other == user_local
         assert d.status == Status.MODIFY
+
+def test_format_indexdiffs(case_wippolder, data_wippolder_gpkg, data_wippolder_gpkg_modified,):
+    (case_local := deepcopy(case_wippolder)).add_data(data_wippolder_gpkg)
+    (case_remote := deepcopy(case_wippolder)).add_data(data_wippolder_gpkg_modified)
+    (index_local := Index()).add_case(case_local)
+    (index_remote := Index()).add_case(case_remote)
+    diff_all = index_local.diff(index_remote)
+    diff_all_formatted = format_indexdiffs(diff_all, push=True)
+    print()
+    print(diff_all_formatted)

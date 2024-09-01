@@ -70,11 +70,11 @@ def test_write_config(mock_user_home, tmp_path):
             email="<EMAIL>",
         )
     )
-    config_new.write_to_file(tmp_path / "config.json")
-    config_new_from_file = Config.read_from_file(tmp_path / "config.json")
+    config_new.write(tmp_path / "config.json")
+    config_new_from_file = Config.load(tmp_path / "config.json")
     assert config_new == config_new_from_file
     # Restore the original version
-    config_original.write_to_file(get_global_config_path())
+    config_original.write(get_global_config_path())
 
 def test_user_from_pretty():
     user = User.from_pretty("Kovács János <janos@kovacs.me>")

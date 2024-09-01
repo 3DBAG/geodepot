@@ -2,7 +2,8 @@
 
 ## Problem statement
 
-We consider two aspects of robustness both for spatial data processing software, in particular 3D: robustness against critical errors that break the execution of the code, and robustness against regression in the quality of the output.
+We consider two aspects of robustness both for spatial data processing software, in particular 3D: robustness against critical errors that break the execution of the code, and robustness against
+regression in the quality of the output.
 For measuring and improving both aspects, a comprehensive set of tests and suitable input data are needed.
 
 Spatial data processing software are often tested against specific inputs/cases ... fake data is not suitable
@@ -68,10 +69,10 @@ The *index* stores the overview of all *cases* in the repository.
 A *case* is identified by its identifier and name.
 A *case* contains one or more *data files*.
 
-#### Data (file)
+#### Data (item)
 
-A *data file* is the actual file that contains the data that is used in a test.
-Data files are regular GIS files, for example GeoPackage, LAS or CityJSON.
+A *data item* is the actual file or directory that contains the data that is used in a test.
+Data items retain their own format when added to the repository, therefore they can be read directly with their format-specific readers.
 
 ### Examples
 
@@ -134,24 +135,31 @@ Returns:
 
 ### Interfaces
 
-#### CLI 
+#### CLI
+
 Supports all operations, this is the main interface.
 
-#### API 
+#### API
+
 The API is meant for passing data paths to tests, nothing else.
 The rest of the operations are done through the CLI.
-Therefore, there are only two functions that are needed: 
-- Maybe `geodepot.configure(<path-to-geodepot-dir>)`, see [Repository layout](#repository-layout), but need to see what is best in combination with `init`. Although, the `geodepot` constructor could be used to configure the repository path too, instead of an explicit `configure` method.
+Therefore, there are only two functions that are needed:
+
+- Maybe `geodepot.configure(<path-to-geodepot-dir>)`, see [Repository layout](#repository-layout), but need to see what is best in combination with `init`. Although, the `geodepot` constructor could
+  be used to configure the repository path too, instead of an explicit `configure` method.
 - `geodepot.init(remote-url)`, which downloads the remote repository, except the data files and makes it possible to get cases.
 - `geodepot.get(case-id, filename-with-ext)`, which returns the full path to a specific file in a specific case on the local system.
 
 The API is available in:
+
 - C++ (implementation)
 - Python (binding)
 - Rust (binding)
 
-#### CMake 
+#### CMake
+
 Offers the same functionality as the API, but with CMake functions:
+
 - `GeodepotInit(remote-url)`
 - `GeodepotGet(case-id, filename-with-ext)`
 
@@ -160,11 +168,13 @@ In that case, I would need to compile the C++ API into an exe, and run that exe 
 See [CMake custom commands](https://cmake.org/cmake/help/latest/guide/tutorial/Adding%20a%20Custom%20Command%20and%20Generated%20File.html).
 
 Even if I could write `GeodepotInit` and `GeodepotGet` purely in cmake-language, using `FetchContent` it may be better to call a compiled exe that is part of the C++ API.
-That is, because, 
+That is, because,
+
 1. the C++ implementation is the single source of truth,
 2. if I need more complex operations in the future, I won't be limited by the cmake-language.
 
 #### QGIS plugin
+
 Support adding, viewing, modifying cases.
 
 ### Commands
@@ -190,6 +200,74 @@ TBD:
 - [snapshot load](#snapshot-load)
 - [snapshot remove](#snapshot-remove)
 
+#### add
+
+**Synopsis**
+
+```shell
+geodepot add [-y] [--license=<text>] [--description=<text>] [--format=<format>] [--as-data] [<pathspec>...] <casespec>
+```
+
+**Description**
+
+Add or update a case or a data item.
+In each operation, the case will be created if it does not exist.
+In each operation, existing values, data files are updated with the newly provided.
+
+**Options**
+
+`<casespec>`:
+Case (and data) specifier, in the form of `case-name[/data-name]`.
+Providing the case name `case-name` is mandatory, the data name `data-name` within the case is optional.
+The rest of the options will affect the specified level, either the whole case with `case-name`, or just a single data within the case with `case-name/data-name`.
+For example, `wippolder/wippolder.gpkg`, where `wippolder` is the case name, `wippolder.gpkg` is the data name.
+
+`<pathspec>`:
+Path specifier for the data files to add to the case.
+Can be a path to a single file, a directory or a fileglob (e.g. `*.gpkg`).
+Can be passed multiple times.
+Only local files are supported.
+
+`-y`:
+Do not require confirmation for updating existing values or files.
+
+`--license=<text>`:
+A license to add to the data.
+
+`--description=<text>`:
+A description to add to the case or data.
+
+`--format=<format>`:
+A format to force on the data in case it cannot be inferred automatically, or the inferred format is not correct.
+If the a whole directory is added as a single data entry with `--as-data`, the automatic format inference doesn't work, and it may be necessary to force a format.
+Note that when the format is forced, the bounding box calculation and hashing does not work.
+
+`--as-data`:
+Add a whole directory as a single data entry.
+The default behaviour is to add each file in the directory as a separate data entry.
+If `--as-data` is set, the bounding box and file hash cannot be computed for the data.
+
+**Examples**
+
+Add multiple files as data entries to a case.
+If the case does not exist, it will be created as `case-name` and the file `file-name` is moved into it.
+
+```shell
+geodepot add /path/to/file-name1 /path/to/file-name2 case-name
+```
+
+Update the license and description of a data entry (`file-name`) in a case (`case-name`).
+
+```shell
+geodepot add --description "long description\nmultiline" --license "CC-0" case-name/file-name1
+```
+
+Update the description of a case (`case-name`)
+
+```shell
+geodepot add --description "new description of the case" case-name
+```
+
 #### config
 
 **Synopsis**
@@ -202,12 +280,12 @@ geodepot config set [--global] <name> <value>
 
 **Description**
 
-You can query or set options with this command. 
+You can query or set options with this command.
 The `name` is actually the section and the key separated by a dot, and the `value` will be escaped.
 
 **Commands**
 
-`list`: 
+`list`:
 List all variables set in the config files, along with their values.
 
 `get`:
@@ -215,7 +293,6 @@ Emits the value of the specified key. If key is present multiple times in the co
 
 `set`:
 Set the value for one configuration option.
-
 
 **Options**
 
@@ -229,6 +306,33 @@ For reading options: read only from the global `~/.geodepotconfig` file rather t
 ```shell
 geodepot config add --global user.name "Kovács János"
 geodepot config add --global user.email janos@kovacs.me
+```
+
+#### get
+
+**Synopsis**
+
+```shell
+geodepot get <casespec>
+```
+
+**Description**
+
+Return the full local path to the specified data item of the specified case.
+If the data item does not exist locally and a remote repository is configured, the data will be downloaded from the remote.
+
+**Options**
+
+`<casespec>`:
+Case (and data) specifier, in the form of `case-name/data-name`.
+For example, `wippolder/wippolder.gpkg`, where `wippolder` is the case name, `wippolder.gpkg` is the data name.
+
+**Examples**
+
+Get the full local path to the data item `wippolder/wippolder.gpkg`.
+
+```shell
+geodepot get wippolder/wippolder.gpkg
 ```
 
 #### init
@@ -262,111 +366,47 @@ geodepot list
 
 List the cases and data items in the repository.
 
-#### show
+#### pull
+
+Downloads any changes from the remote repository, overwriting the local version.
+Without arguments, it checks and downloads all cases if needed.
+With the case ID as argument, `geodepot pull <case-id>`, it only checks and downloads the specified case.
+
+#### push
+
+Uploads any local changes to the remote repository, overwriting the remote version.
+If the remote contains a changed version that is not the previous state of the local, the `push` operation exits without making any changes on the remote.
+In this case the `-f, --force` option can forcibly overwrite the remote, even if there are unknown changes.
+
+#### remote
 
 **Synopsis**
 
 ```shell
-geodepot show <casespec>
+geodepot remote list
+geodepot remote add <name> <url>
+geodepot remote remove <name>
 ```
 
 **Description**
 
-Show the details of the specified case or data.
+Connect an existing remote Geodepot repository.
 
-#### get
+**Commands**
 
-**Synopsis**
+`list`:
+List the available remote repositories.
 
-```shell
-geodepot get <casespec>
-```
+`add`:
+Add a remote repository to track. The remote repository must exist.
 
-**Description**
-
-Return the full local path to the specified data item of the specified case.
-If the data item does not exist locally and a remote repository is configured, the data will be downloaded from the remote.
-
-**Options**
-
-`<casespec>`:
-Case (and data) specifier, in the form of `case-name/data-name`.
-For example, `wippolder/wippolder.gpkg`, where `wippolder` is the case name, `wippolder.gpkg` is the data name.
+`remove`:
+Remove the remote from the tracked remotes. The remote repository is not deleted.
 
 **Examples**
 
-Get the full local path to the data item `wippolder/wippolder.gpkg`.
-
 ```shell
-geodepot get wippolder/wippolder.gpkg
-```
-
-#### add
-
-**Synopsis**
-
-```shell
-geodepot add [-y] [--license=<text>] [--description=<text>] [--format=<format>] [--as-data] [<pathspec>...] <casespec>
-```
-
-**Description**
-
-Add or update a case or a data item.
-In each operation, the case will be created if it does not exist.
-In each operation, existing values, data files are updated with the newly provided.
-
-**Options**
-
-`<casespec>`:
-Case (and data) specifier, in the form of `case-name[/data-name]`.
-Providing the case name `case-name` is mandatory, the data name `data-name` within the case is optional.
-The rest of the options will affect the specified level, either the whole case with `case-name`, or just a single data within the case with `case-name/data-name`.
-For example, `wippolder/wippolder.gpkg`, where `wippolder` is the case name, `wippolder.gpkg` is the data name.
-
-`<pathspec>`:
-Path specifier for the data files to add to the case.
-Can be a path to a single file, a directory or a fileglob (e.g. `*.gpkg`).
-Can be passed multiple times.
-Only local files are supported.
-
-`-y`: 
-Do not require confirmation for updating existing values or files.
-
-`--license=<text>`: 
-A license to add to the data.
-
-`--description=<text>`: 
-A description to add to the case or data.
-
-`--format=<format>`: 
-A format to force on the data in case it cannot be inferred automatically, or the inferred format is not correct.
-If the a whole directory is added as a single data entry with `--as-data`, the automatic format inference doesn't work, and it may be necessary to force a format.
-Note that when the format is forced, the bounding box calculation and hashing does not work.
-
-`--as-data`:
-Add a whole directory as a single data entry.
-The default behaviour is to add each file in the directory as a separate data entry.
-If `--as-data` is set, the bounding box and file hash cannot be computed for the data.
-
-**Examples**
-
-Add multiple files as data entries to a case.
-If the case does not exist, it will be created as `case-name` and the file `file-name` is moved into it.
-
-```shell
-geodepot add /path/to/file-name1 /path/to/file-name2 case-name
-```
-
-Update the license and description of a data entry (`file-name`) in a case (`case-name`).
-
-```shell
-geodepot add --description "long description\nmultiline" --license "CC-0" case-name/file-name1
-```
-
-Update the description of a case (`case-name`)
-
-```shell
-geodepot add --description "new description of the case" case-name
+geodepot remote add origin https://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot
 ```
 
 #### remove
@@ -390,57 +430,26 @@ Providing the case name `case-name` is mandatory, the data name `data-name` with
 The rest of the options will affect the specified level, either the whole case with `case-name`, or just a single data within the case with `case-name/data-name`.
 For example, `wippolder/wippolder.gpkg`, where `wippolder` is the case name, `wippolder.gpkg` is the data name.
 
-`-y`: 
+`-y`:
 Do not require confirmation for deleting the entries.
 
-#### pull
+#### show
 
-Downloads any changes from the remote repository, overwriting the local version.
-Without arguments, it checks and downloads all cases if needed. 
-With the case ID as argument, `geodepot pull <case-id>`, it only checks and downloads the specified case.
+**Synopsis**
 
-#### push
+```shell
+geodepot show <casespec>
+```
 
-Uploads any local changes to the remote repository, overwriting the remote version.
-If the remote contains a changed version that is not the previous state of the local, the `push` operation exits without making any changes on the remote.
-In this case the `-f, --force` option can forcibly overwrite the remote, even if there are unknown changes.
+**Description**
+
+Show the details of the specified case or data.
 
 #### verify
 
 Verify the integrity of the repository, by comparing the stored hashes in the INDEX to the recomputed hash of the corresponding files.
 Without arguments, it verifies the local repository.
 With the remote name as argument, it verifies the remote repository.
-
-#### remote
-
-**Synopsis**
-
-```shell
-geodepot remote list
-geodepot remote add <name> <url>
-geodepot remote remove <name>
-```
-
-**Description**
-
-Connect an existing remote Geodepot repository.
-
-**Commands**
-
-`list`:
-List the available remote repositories.
-
-`add`: 
-Add a remote repository to track. The remote repository must exist.
-
-`remove`: 
-Remove the remote from the tracked remotes. The remote repository is not deleted.
-
-**Examples**
-
-```shell
-geodepot remote add origin https://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot
-```
 
 #### snapshot
 
@@ -603,7 +612,7 @@ deleted data case-A/data-C
 +extent_original_srs=wkt_original_new
 ```
 
-#### push 
+#### push
 
 The scenarios below describe the change of a specific case.
 Pushing the repository follows the same steps, just it does so for each case in sequence.
@@ -613,11 +622,12 @@ Pushing the repository follows the same steps, just it does so for each case in 
 User makes local changes and wants to update the remote.
 The local INDEX contains the hash of the last update (push/pull).
 User issues `push <case-id>`, then:
+
 1. Check if the remote is locked. If not, then continue.
 2. Place a LOCK on the remote, with information on who owns the lock. This prevents that the remote is updated by someone else, while the User uploads the changes.
 3. Compress the changed case into a temp directory/file.
 4. Compute SHA-1 of zip file.
-5. Compare the case's local data hash in the INDEX with the remote data hash in the INDEX. Maybe compare the whole INDEX? Because not on the data files can change, but also the description, license. 
+5. Compare the case's local data hash in the INDEX with the remote data hash in the INDEX. Maybe compare the whole INDEX? Because not on the data files can change, but also the description, license.
 6. If there is no difference, that means that the remote hasn't changed since the local changes were made and it is safe to overwrite the remote with the local changes.
 7. Overwrite the case's hash in remote INDEX with the hash of the new zipped case on the local.
 8. Upload the local zip to the remote and overwrite the remote case with it.
@@ -628,6 +638,7 @@ User issues `push <case-id>`, then:
 User makes local changes and wants to update the remote.
 The local INDEX contains the hash of the last update (push/pull).
 User issues `push <case-id>`, then:
+
 1. Check if the remote is locked. If yes, then stop and display who owns the lock, tell the User to try again later.
 
 **C. Remote has changed**
@@ -635,12 +646,14 @@ User issues `push <case-id>`, then:
 User makes local changes and wants to update the remote.
 The local INDEX contains the hash of the last update (push/pull).
 User issues `push <case-id>`, then:
+
 1. Check if the remote is locked. If not, then continue.
 2. Place a LOCK on the remote, with information on who owns the lock. This prevents that the remote is updated by someone else, while the User uploads the changes.
 3. Compress the changed case into a temp directory/file.
 4. Compute SHA-1 of zip file.
 5. Compare the case's local INDEX hash with the remote INDEX hash.
-6. If there is a difference, that means that the remote has changed since the last pull. This situation cannot be resolved automatically, because geodepot cannot merge data files. The `push` stops and displays who made the last change, the path to the new temp-archive and tells to User to contact the last-changer to resolve the conflict.
+6. If there is a difference, that means that the remote has changed since the last pull. This situation cannot be resolved automatically, because geodepot cannot merge data files. The `push` stops and
+   displays who made the last change, the path to the new temp-archive and tells to User to contact the last-changer to resolve the conflict.
 7. Remove the LOCK from the remote.
 
 #### pull
@@ -650,12 +663,10 @@ If there are changed cases that haven't been pushed...
 The `pull` operation also places a LOCK on the remote, to prevent it from change during the download.
 Once the download is complete, the LOCK is removed.
 
-
-
 ### Data files
 
-Data is in *.zip*. 
-There is no custom format, just plain GIS formats zipped. 
+Data is in *.zip*.
+There is no custom format, just plain GIS formats zipped.
 2D vector formats are thus GDAL-readable from within the *.zip*.
 
 When data is added, its BBox is computed from the data or header.
@@ -683,10 +694,12 @@ In the example below, `wippolder` is a case ID.
 └── snapshots
 ```
 
-The zip-compressed cases are stored along with the uncompressed version, so that pulling a case or repository is as fast as possible and it does not involve other operations on the remote than transferring the file.
+The zip-compressed cases are stored along with the uncompressed version, so that pulling a case or repository is as fast as possible and it does not involve other operations on the remote than
+transferring the file.
 When the archive is downloaded, it is extracted into the same directory and the archive is retained.
 When a data file is retrieved from a case with `get`, the file path points to the uncompressed case.
-Although, retaining the archives increases the space consumption significantly, I expect that the data files are relatively small so in total the space consumption will remain acceptable and the benefits of having the archives ready for download will outweigh the space costs.
+Although, retaining the archives increases the space consumption significantly, I expect that the data files are relatively small so in total the space consumption will remain acceptable and the
+benefits of having the archives ready for download will outweigh the space costs.
 
 When using the CLI, geodepot looks for the `.geodepot` directory in the current directory.
 When using the API, geodepot can be configured with a path to `.geodepot`, e.g. `geodepot.configure(<path-to-geodepot-dir>)`.
@@ -708,7 +721,7 @@ Additionally, Python is not the best language to write bindings to other languag
 Unless, I compile it into an exe with pyinstaller.
 With pyinstaller, geodepot is compiled into a statically linked exe, so it can be used without Python and GIS dependencies.
 We can write it all in Python, and distribute the exe.
-Then write the API in C++/Rust, which is easy, because they only need two functions, `configure` and `get`. 
+Then write the API in C++/Rust, which is easy, because they only need two functions, `configure` and `get`.
 Both are simple operations.
 In this case, the API would have a complete independent codebase from the geodepot app, thus it wouldn't require any of the heavy dependencies, which is nice.
 Maintaining the two functions in the API is easy enough.
@@ -720,6 +733,7 @@ The exe must stay in the directory, thus when the user downloads the latest rele
 I could create and install script for each release, which would download the latest release, move to the correct location, evtl. replace the old version and take care to adding the exe to the path.
 
 The installer script,
+
 - downloads the latest release,
 - moves it to the correct location, replacing the previous version,
 - updates the PATH to include the exe if needed,
@@ -756,11 +770,12 @@ git lfs could be sth to use, but maybe overkill because need to set up and opera
 - Try building wheels for the deps, so that geodepot is pip-installable
 - Read license from a file
 - Optimizations:
-  - ~~import only the used functions~~
-  - generators, list comprehension
-  - flatten nested conditionals
-  - choose tuple over list
-- Improve repository discovery so that the project repository is found even from subdirectories. See how Git does it with [`GIT_DIR` et al.](https://git-scm.com/book/en/v2/Git-Internals-Environment-Variables).
+    - ~~import only the used functions~~
+    - generators, list comprehension
+    - flatten nested conditionals
+    - choose tuple over list
+- Improve repository discovery so that the project repository is found even from subdirectories. See how Git does it with [
+  `GIT_DIR` et al.](https://git-scm.com/book/en/v2/Git-Internals-Environment-Variables).
 - Robust CityJSONSeq import, so that the metadata can be a separate file.
 
 

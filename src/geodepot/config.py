@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from json import dumps, load, loads, JSONEncoder
 from logging import getLogger
 from pathlib import Path
-from typing import Self
+from typing import Self, NewType
 
 from geodepot import GEODEPOT_CONFIG_GLOBAL, GEODEPOT_CONFIG_LOCAL
 from geodepot.encode import DataClassEncoder
@@ -37,6 +37,7 @@ def as_user(dct: dict) -> User | dict:
     else:
         return dct
 
+RemoteName = NewType("RemoteName", str)
 
 @dataclass(repr=True)
 class Remote:
@@ -63,7 +64,7 @@ class Config:
     remotes: dict[str, Remote] | None = None
 
     @classmethod
-    def read_from_file(cls, path: Path) -> Self:
+    def load(cls, path: Path) -> Self:
         logger.debug(f"Reading config from file: {path}")
         with path.open() as f:
             c = load(f, object_hook=as_config)
@@ -72,7 +73,7 @@ class Config:
             # instance.
             return c if not isinstance(c, dict) else Config(user=User(), remotes=dict())
 
-    def write_to_file(self, path: Path) -> None:
+    def write(self, path: Path) -> None:
         logger.debug(f"Writing config to file: {path}")
         path.write_text(self.to_json())
 
@@ -91,7 +92,10 @@ class Config:
             self.remotes = other.remotes
 
     def add_remote(self, name: str, url: str):
-        self.remotes[name] = Remote(name=name, url=url)
+        if self.remotes is None:
+            self.remotes = {name: Remote(name=name, url=url)}
+        else:
+            self.remotes[name] = Remote(name=name, url=url)
 
     def remove_remote(self, name: str):
         del self.remotes[name]
@@ -163,7 +167,7 @@ def get_global_config_path() -> Path | None:
 
 def get_global_config() -> Config | None:
     if (global_config_path := get_global_config_path()) is not None:
-        return Config.read_from_file(global_config_path)
+        return Config.load(global_config_path)
 
 
 def get_local_config_path() -> Path | None:
@@ -173,7 +177,7 @@ def get_local_config_path() -> Path | None:
 
 def get_local_config() -> Config | None:
     if (local_config_path := get_local_config_path()) is not None:
-        return Config.read_from_file(local_config_path)
+        return Config.load(local_config_path)
 
 
 def get_config() -> Config:
@@ -195,7 +199,7 @@ def get_config() -> Config:
     return config
 
 
-def get_current_user() -> User:
+def get_current_user() -> User | None:
     config = get_config()
     return config.user
 
@@ -216,7 +220,7 @@ def configure(key: str, value: str | None = None, global_config: bool = False) -
         setattr(sec_val, variable, value)
         logger.debug(f"Set {key} to {value} (global={global_config})")
     config_path = get_global_config_path() if global_config else get_local_config_path()
-    config.write_to_file(config_path)
+    config.write(config_path)
 
 
 def config_list() -> list[str]:
@@ -244,10 +248,10 @@ def remote_list() -> list[str]:
 def remote_add(name: str, url: str):
     config = get_local_config()
     config.add_remote(name, url)
-    config.write_to_file(get_local_config_path())
+    config.write(get_local_config_path())
 
 
 def remote_remove(name: str):
     config = get_local_config()
     config.remove_remote(name)
-    config.write_to_file(get_local_config_path())
+    config.write(get_local_config_path())

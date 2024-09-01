@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field, fields
 from enum import Enum, auto
+from itertools import groupby
 from logging import getLogger
 from pathlib import Path
 from shutil import copy2, copytree, rmtree
@@ -7,6 +8,7 @@ from typing import Self, Any
 from urllib.parse import urlparse
 
 from osgeo.ogr import UseExceptions
+from requests import head as requests_head
 
 from geodepot import (
     GEODEPOT_CONFIG_LOCAL,
@@ -15,7 +17,8 @@ from geodepot import (
     GEODEPOT_CASES,
 )
 from geodepot.case import CaseName, Case, CaseSpec
-from geodepot.config import Config, get_current_user, User, get_config, Remote
+from geodepot.config import Config, get_current_user, User, get_config, Remote, \
+    RemoteName
 from geodepot.data import Data
 from geodepot.errors import GeodepotRuntimeError, GeodepotInvalidRepository
 
@@ -55,6 +58,36 @@ def create_modified_diff(
     )
 
 
+def format_indexdiffs(diff_all: list[IndexDiff], push: bool = True) -> str:
+    sign_local = "+" if push else "-"
+    sign_remote = "-" if push else "+"
+    l_casespec = lambda cs: (cs.casespec_self, cs.status)
+    diff_all_sorted = sorted(diff_all, key=l_casespec)
+    all_changes = []
+    currentuser = get_current_user()
+    for k, g in groupby(diff_all_sorted, key=l_casespec):
+        changes = []
+        # Add the case/data header
+        indexdiff = next(g)
+
+        changes.append(
+            f"{sign_local * 3} local/{indexdiff.casespec_self}    ({currentuser.to_pretty() if currentuser else None})\n{sign_remote * 3} remote/{indexdiff.casespec_other}    ({indexdiff.changed_by_other.to_pretty() if indexdiff.changed_by_other else None})")
+        if indexdiff.status == Status.MODIFY:
+            changes.append(
+                f"{sign_local}{indexdiff.member}={indexdiff.value_self}\n{sign_remote}{indexdiff.member}={indexdiff.value_other}")
+        # Report the modified values
+        for indexdiff in g:
+            if indexdiff.status == Status.MODIFY:
+                if indexdiff.member.startswith("bbox"):
+                    wkt_self = None if indexdiff.value_self is None else indexdiff.value_self.to_wkt()
+                    wkt_other = None if indexdiff.value_other is None else indexdiff.value_other.to_wkt()
+                    changes.append(f"{sign_local}{indexdiff.member}={indexdiff.value_self}\n{sign_remote}{indexdiff.member}={indexdiff.value_other}\n{sign_local}{indexdiff.member} (WKT)={wkt_self}\n{sign_remote}{indexdiff.member} (WKT)={wkt_other}")
+                else:
+                    changes.append(
+                        f"{sign_local}{indexdiff.member}={indexdiff.value_self}\n{sign_remote}{indexdiff.member}={indexdiff.value_other}")
+        all_changes.append("\n\n".join(changes))
+    return "\n\n".join(all_changes)
+
 # to update index: https://pcjericks.github.io/py-gdalogr-cookbook/vector_layers.html#load-data-to-memory
 @dataclass(repr=True, order=True)
 class Index:
@@ -66,7 +99,7 @@ class Index:
     def remove_case(self, case_name: CaseName) -> Case | None:
         return self.cases.pop(case_name, None)
 
-    def serialize(self, path: Path):
+    def write(self, path: Path):
         from osgeo.ogr import (
             GetDriverByName,
             FieldDefn,
@@ -147,10 +180,11 @@ class Index:
             logger.critical(f"Failed to serialize index with exception {e}")
 
     @classmethod
-    def deserialize(cls, path: Path) -> Self | None:
-        if not path.exists():
-            logger.critical(f"Index path {path} does not exist")
-            return None
+    def load(cls, path: Path | str) -> Self | None:
+        if isinstance(path, Path):
+            if not path.exists():
+                logger.critical(f"Index path {path} does not exist")
+                return None
         from osgeo.ogr import GetDriverByName
 
         cases_in_index = {}
@@ -193,9 +227,24 @@ class Index:
                     if data_other is not None:
                         for member in fields(Data):
                             if member.name not in ("name", "changed_by"):
+                                member_name = member.name
                                 value_self = getattr(data_self, member.name)
                                 value_other = getattr(data_other, member.name)
                                 if value_self != value_other:
+                                    # Nasty piece this complex BBoxSRS type...
+                                    if member.name == "bbox":
+                                        if value_self.srs_wkt != value_other.srs_wkt:
+                                            member_name = "srs"
+                                            value_self = value_self.srs_wkt
+                                            value_other = value_other.srs_wkt
+                                        elif value_self.bbox_original_srs != value_other.bbox_original_srs:
+                                            member_name = "bbox_original_srs"
+                                            value_self = value_self.bbox_original_srs
+                                            value_other = value_other.bbox_original_srs
+                                        elif value_self.bbox_epsg_3857 != value_other.bbox_epsg_3857:
+                                            member_name = "bbox_epsg_3857"
+                                            value_self = value_self.bbox_epsg_3857
+                                            value_other = value_other.bbox_epsg_3857
                                     diff_all.append(
                                         IndexDiff(
                                             casespec_self=casespec,
@@ -204,7 +253,7 @@ class Index:
                                             changed_by_other=data_other.changed_by,
                                             value_self=value_self,
                                             value_other=value_other,
-                                            member=member.name,
+                                            member=member_name,
                                         )
                                     )
                     else:
@@ -279,6 +328,7 @@ def is_url(path: str) -> bool:
 class Repository:
     path: Path = field(default_factory=lambda: Path.cwd() / ".geodepot")
     index: Index | None = None
+    index_remote: Index | None = None
     config: Config | None = None
 
     @property
@@ -337,7 +387,7 @@ class Repository:
                 if "origin" not in config.remotes:
                     remote_origin = Remote(name="origin", url=url_root)
                     config.remotes["origin"] = remote_origin
-                    config.write_to_file(path_local.joinpath(GEODEPOT_CONFIG_LOCAL))
+                    config.write(path_local.joinpath(GEODEPOT_CONFIG_LOCAL))
                     logger.debug(f"Added {remote_origin} to config.remotes")
                 self._load_from_path(path_local)
             else:
@@ -352,18 +402,6 @@ class Repository:
                     raise GeodepotInvalidRepository(f"Not a Geodepot repository ({p}).")
         else:
             raise TypeError("Path must be a string or None")
-
-    def load_config(self):
-        """Load the configuration."""
-        self.config = get_config()
-
-    def load_index(self):
-        """Load the index."""
-        self.index = Index.deserialize(self.path_index)
-
-    def write_index(self):
-        """Serialize the index."""
-        self.index.serialize(self.path_index)
 
     def add(
         self,
@@ -427,23 +465,37 @@ class Repository:
                     data_description=data_description,
                     data_changed_by=current_user,
                 )
-                self.copy_data(p, casespec)
+                self._copy_data(p, casespec)
                 logger.info(f"Added {data.name} to {case.name}")
                 logger.debug(data.to_pretty())
         self.index.add_case(case)
         self.write_index()
         logger.debug(f"Serialized the index to {self.path_index}")
 
+    def fetch(self, remote: RemoteName) -> list[IndexDiff]:
+        self.load_index(remote)
+        return self.index.diff(self.index_remote)
+
     def get_case(self, casespec: CaseSpec) -> Case | None:
         """Retrieve an existing case."""
         return self.index.cases.get(casespec.case_name)
 
-    def init_case(self, casespec: CaseSpec) -> Case:
-        """Create a new case an return it."""
-        case = Case(name=casespec.case_name, description=None)
-        self.index.add_case(case)
-        self.path_cases.joinpath(casespec.case_name).mkdir()
-        return self.get_case(casespec)
+    def get_data(self, casespec: CaseSpec) -> Data | None:
+        """Retrieve an existing data item.
+
+        Return `None` if the data does not exist, or `casespec` does not specify a
+        `data_name`.
+        """
+        if casespec.data_name is None:
+            logger.error(
+                f"Must specify data_name in {casespec} for getting a data item."
+            )
+            return None
+        case = self.get_case(casespec)
+        if case is not None:
+            return case.get_data(casespec.data_name)
+        logger.info(f"The entry {casespec} does not exist in the repository.")
+        return None
 
     def get_data_path(self, casespec: CaseSpec) -> Path | None:
         """Retrieve the full path to an existing data item.
@@ -470,7 +522,7 @@ class Repository:
                     response = requests_get(url_remote_data)
                     if response.status_code == 200:
                         data_path.parent.mkdir(exist_ok=True)
-                        data_path.open("wb").write(response.content)
+                        data_path.write_bytes(response.content)
                         logger.info(f"Downloaded {casespec} from remote '{remote}'")
                         return data_path
                     elif response.status_code == 404:
@@ -484,49 +536,85 @@ class Repository:
         logger.info(f"The entry {casespec} does not exist in the repository.")
         return None
 
-    def get_data(self, casespec: CaseSpec) -> Data | None:
-        """Retrieve an existing data item.
+    def init_case(self, casespec: CaseSpec) -> Case:
+        """Create a new case an return it."""
+        case = Case(name=casespec.case_name, description=None)
+        self.index.add_case(case)
+        self.path_cases.joinpath(casespec.case_name).mkdir()
+        return self.get_case(casespec)
 
-        Return `None` if the data does not exist, or `casespec` does not specify a
-        `data_name`.
+    def load_config(self):
+        """Load the configuration."""
+        self.config = get_config()
+
+    def load_index(self, remote: RemoteName | None = None):
+        """Load the index.
+
+        If 'remote' is provided, download and load the index from the remote.
         """
-        if casespec.data_name is None:
-            logger.error(
-                f"Must specify data_name in {casespec} for getting a data item."
-            )
-            return None
-        case = self.get_case(casespec)
-        if case is not None:
-            return case.get_data(casespec.data_name)
-        logger.info(f"The entry {casespec} does not exist in the repository.")
-        return None
-
-    def copy_data(self, path: Path, casespec: CaseSpec):
-        """Copies a data entry into the repository."""
-        if path.is_file():
-            if casespec.data_name is not None:
-                # Rename the file when copied into the case
-                copy2(
-                    path,
-                    self.path_cases.joinpath(casespec.case_name, casespec.data_name),
-                )
-            else:
-                # Keep the file name
-                copy2(path, self.path_cases.joinpath(casespec.case_name, path.name))
+        if remote is None:
+            self.index = Index.load(self.path_index)
         else:
-            if casespec.data_name is not None:
-                # Copying a directory as a single data entry under a new name
-                copytree(
-                    path,
-                    self.path_cases.joinpath(casespec.case_name, casespec.data_name),
-                    dirs_exist_ok=True,
-                )
-            else:
-                copytree(
-                    path,
-                    self.path_cases.joinpath(casespec.case_name, path.name),
-                    dirs_exist_ok=True,
-                )
+            remote = self.config.remotes.get(remote)
+            if remote is None:
+                raise GeodepotInvalidRepository(f"The remote '{remote}' is not configured for this repository. You can add it with 'remote add'.")
+            remote_index_url = "/".join([remote.url, GEODEPOT_INDEX])
+            if requests_head(remote_index_url).status_code != 200:
+                raise GeodepotInvalidRepository(
+                    f"The remote '{remote}' cannot be accessed or does not contain a {GEODEPOT_INDEX} at {remote_index_url}.")
+            self.index_remote = Index.load(remote_index_url)
+
+    def push(self, remote: RemoteName):
+        """Overwrite the remote repository with the changes in the local."""
+        from fabric import Connection
+
+        diff_all = self.fetch(remote=remote)
+        # i.status == Status.DELETE, because if the remote does not contain a data, it
+        # shows as it deleted it
+        data_to_upload = set(i.casespec_self for i in diff_all if i.status == Status.DELETE or i.status == Status.MODIFY)
+        # Similarly, i.status == Status.ADD, because the remote contains a data that the
+        # local doesn't, thus it 'adds' it w.r.t to the local. Since we push, we
+        # overwrite the remote, meaning that if the local doesn't contain a specific
+        # data, the remote shouldn't have it either.
+        data_to_delete = set(i.casespec_other for i in diff_all if i.status == Status.ADD)
+
+        path_remote_cases = "/".join([self.config.remotes[remote].url, GEODEPOT_CASES])
+        conn_ssh = Connection(self.config.remotes[remote].url)
+
+        # todo: implement complete case transfer and delete
+        for data in data_to_upload:
+            if data.data_name is not None:
+                data_path_local = self.get_data_path(casespec=data)
+                data_path_remote = "/".join([path_remote_cases, str(data)])
+                result = conn_ssh.put(data_path_local, remote=data_path_remote)
+                if not result.ok:
+                    logger.error(f"Failed to transfer {data} to {remote}")
+                else:
+                    logger.info(f"Transferred {data} to {remote}")
+        for data in data_to_delete:
+            if data.data_name is not None:
+                data_path_remote = "/".join([path_remote_cases, str(data)])
+                result = conn_ssh.run(f"rm {data_path_remote}")
+                if not result.ok:
+                    logger.error(f"Failed to delete {data} on {remote}")
+                else:
+                    logger.info(f"Deleted {data} on {remote}")
+
+        path_remote_index = "/".join([self.config.remotes[remote].url, GEODEPOT_INDEX])
+        result = conn_ssh.put(self.path_index, remote=path_remote_index)
+        if not result.ok:
+            logger.error(f"Failed to transfer {GEODEPOT_INDEX} to {remote}")
+        else:
+            logger.info(f"Transferred {GEODEPOT_INDEX} to {remote}")
+
+    def pull(self, remote: RemoteName):
+        """Overwrite the local repository with the changes in the remote."""
+        self.load_index(remote)
+        diff_all = self.index.diff(self.index_remote)
+        # See comments in 'push'. Here we do the opposite, because we overwrite the
+        # local with the remote.
+        data_to_download = set(i.casespec_other for i in diff_all if i.status == Status.ADD or i.status == Status.MODIFY)
+        data_to_delete = set(i.casespec_self for i in diff_all if i.status == Status.DELETE)
 
     def remove(self, casespec: CaseSpec):
         """Remove an entry from the repository."""
@@ -558,15 +646,36 @@ class Repository:
                     f"The case {casespec.case_name} does not exist in the repository"
                 )
 
-    def _new_at_path(self, path: Path):
-        self.path = path
-        self.path.mkdir()
-        self.path_cases.mkdir()
-        self.index = Index()
-        self.index.serialize(self.path_index)
-        self.config = Config()
-        self.config.write_to_file(self.path_config_local)
-        logger.info(f"Initialized empty Geodepot repository at {self.path}")
+    def write_index(self):
+        """Serialize the index."""
+        self.index.write(self.path_index)
+
+    def _copy_data(self, path: Path, casespec: CaseSpec):
+        """Copies a data entry into the repository."""
+        if path.is_file():
+            if casespec.data_name is not None:
+                # Rename the file when copied into the case
+                copy2(
+                    path,
+                    self.path_cases.joinpath(casespec.case_name, casespec.data_name),
+                )
+            else:
+                # Keep the file name
+                copy2(path, self.path_cases.joinpath(casespec.case_name, path.name))
+        else:
+            if casespec.data_name is not None:
+                # Copying a directory as a single data entry under a new name
+                copytree(
+                    path,
+                    self.path_cases.joinpath(casespec.case_name, casespec.data_name),
+                    dirs_exist_ok=True,
+                )
+            else:
+                copytree(
+                    path,
+                    self.path_cases.joinpath(casespec.case_name, path.name),
+                    dirs_exist_ok=True,
+                )
 
     def _load_from_path(self, path: Path):
         self.path = path
@@ -581,6 +690,16 @@ class Repository:
                 f"local config {self.path_config_local} does not exist"
             )
         logger.debug(f"Loaded existing geodepot repository at {self.path}")
+
+    def _new_at_path(self, path: Path):
+        self.path = path
+        self.path.mkdir()
+        self.path_cases.mkdir()
+        self.index = Index()
+        self.index.write(self.path_index)
+        self.config = Config()
+        self.config.write(self.path_config_local)
+        logger.info(f"Initialized empty Geodepot repository at {self.path}")
 
 
 def parse_pathspec(pathspec: str, as_data: bool = False) -> list[Path]:

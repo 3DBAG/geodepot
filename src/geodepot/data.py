@@ -38,6 +38,9 @@ class BBox:
     maxx: float
     maxy: float
 
+    def __str__(self):
+        return f"[{self.minx}, {self.miny}, {self.maxx}, {self.maxy}]"
+
     def to_ogr_geometry_wkbpolygon(self):
         """Convert to an OGR Geometry that is a wkbPolygon."""
         from osgeo.ogr import Geometry, wkbPolygon, wkbLinearRing
@@ -316,11 +319,17 @@ class Data:
         return df
 
     def to_pretty(self) -> str:
-        output = [f"{self.name}", f"\n{self.description}", f"\nformat={self.format}",
+        bbox_wkt = None
+        srs_wkt = None
+        if (bbox := self.bbox) is not None:
+            srs_wkt = bbox.srs_wkt
+            if bbox.bbox_original_srs is not None:
+                bbox_wkt = bbox.bbox_original_srs.to_wkt()
+        output = [f"NAME={self.name}", f"\nDESCRIPTION={self.description}", f"\nformat={self.format}",
                   f"driver={self.driver}", f"license={self.license}",
-                  f"sha1={self.sha1}", f"changed_by={self.changed_by.to_pretty()}",
-                  f"extent={self.bbox.bbox_original_srs.to_wkt()}",
-                  f"srs={self.bbox.srs_wkt}"]
+                  f"sha1={self.sha1}", f"changed_by={self.changed_by.to_pretty() if self.changed_by is not None else None}",
+                  f"extent={bbox_wkt}",
+                  f"srs={srs_wkt}"]
         return "\n".join(output)
 
 
