@@ -564,11 +564,10 @@ class Repository:
                     f"The remote '{remote}' cannot be accessed or does not contain a {GEODEPOT_INDEX} at {remote_index_url}.")
             self.index_remote = Index.load(remote_index_url)
 
-    def push(self, remote: RemoteName):
+    def push(self, remote: RemoteName, diff_all: list[IndexDiff]):
         """Overwrite the remote repository with the changes in the local."""
         from fabric import Connection
 
-        diff_all = self.fetch(remote=remote)
         # i.status == Status.DELETE, because if the remote does not contain a data, it
         # shows as it deleted it
         data_to_upload = set(i.casespec_self for i in diff_all if i.status == Status.DELETE or i.status == Status.MODIFY)

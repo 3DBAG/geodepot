@@ -16,10 +16,16 @@ from geodepot.config import (
     configure,
     remote_list,
     remote_add,
-    remote_remove,
+    remote_remove, RemoteName,
 )
+from geodepot.data import logger
 from geodepot.errors import GeodepotInvalidRepository
-from geodepot.repository import Repository
+from geodepot.repository import Repository, format_indexdiffs
+
+
+def abort_if_false(ctx, param, value):
+    if not value:
+        ctx.abort()
 
 
 @group()
@@ -124,6 +130,18 @@ def config_set_cmd(ctx, name, value, global_config):
     configure(key=name, value=value, global_config=global_config)
 
 
+@command(
+    name="fetch",
+    help="Fetch the state of the remote and report the differences between it and the local repository. NAME is the name of the remote.",
+)
+@argument("name")
+@pass_context
+def fetch_cmd(ctx, name):
+    repo = get_repository(ctx)
+    diff_all = repo.fetch(remote=RemoteName(name))
+    ctx.obj["logger"].info(format_indexdiffs(diff_all))
+
+
 @command(name="get", help="Return the full local path to the specified data item.")
 @argument("casespec")
 @pass_context
@@ -161,10 +179,26 @@ def pull_cmd(ctx):
     repo = get_repository(ctx)
 
 
-@command(name="push")
+@command(name="push", help="Uploads the local changes to the remote repository, overwriting the remote.")
+@argument("name")
+@option("-y", "--yes", "force_yes", is_flag=True, default=False, help="Skip confirmation before overwriting the remote.")
 @pass_context
-def push_cmd(ctx):
+def push_cmd(ctx, name, force_yes):
     repo = get_repository(ctx)
+    diff_all = repo.fetch(remote=RemoteName(name))
+    if len(diff_all) == 0:
+        ctx.obj["logger"].info("No changes detected. Exiting.")
+        return True
+    ctx.obj["logger"].info("\n\n" + format_indexdiffs(diff_all))
+    if force_yes:
+        yes_input = True
+    else:
+        yes_input = input(f"The remote '{name}' differs from the local repository in the details listed above. Do you want to overwrite the the remote with the local data? [y/n]: ").lower() in ("y", "yes")
+    if yes_input:
+        repo.push(remote=RemoteName(name), diff_all=diff_all)
+        ctx.obj["logger"].info(f"Successfully pushed the local changes to '{name}'.")
+    else:
+        ctx.obj["logger"].info("Exiting without pushing the local changes.")
 
 
 @group(name="remote", help="Connect an existing remote Geodepot repository.")
@@ -243,6 +277,7 @@ def get_repository(ctx: Context) -> Repository:
 
 geodepot_grp.add_command(add_cmd)
 geodepot_grp.add_command(config_grp)
+geodepot_grp.add_command(fetch_cmd)
 geodepot_grp.add_command(get_cmd)
 geodepot_grp.add_command(init_cmd)
 geodepot_grp.add_command(list_cmd)

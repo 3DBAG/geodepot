@@ -183,11 +183,12 @@ the commands that have the same name as in git, but do sth different are confusi
 
 - [x] [add](#add)
 - [x] [config](#config)
+- [x] [fetch](#fetch)
 - [x] [get](#get)
 - [x] [init](#init)
 - [x] [list](#list)
 - [pull](#pull)
-- [push](#push)
+- [x] [push](#push)
 - [x] [remote](#remote-list)
 - [x] [remove](#remove)
 - [x] [show](#show)
