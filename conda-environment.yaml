@@ -25,6 +25,7 @@ dependencies:
   - azure-storage-blobs-cpp=12.12.0=hd2e3451_0
   - azure-storage-common-cpp=12.7.0=h10ac4d7_1
   - azure-storage-files-datalake-cpp=12.11.0=h325d260_1
+  - bcrypt=3.2.0=py312h5eee18b_1
   - binutils=2.40=h4852527_7
   - binutils_impl_linux-64=2.40=ha1999f0_7
   - binutils_linux-64=2.40=hb3c18ed_0
@@ -36,10 +37,15 @@ dependencies:
   - ca-certificates=2024.7.4=hbcca054_0
   - ceres-solver=2.2.0=hfae76b8_3
   - certifi=2024.7.4=py312h06a4308_0
+  - cffi=1.16.0=py312h5eee18b_1
   - click=8.1.7=unix_pyh707e725_0
   - cpd=0.5.5=h434a139_2
+  - cryptography=43.0.0=py312hdda0065_0
+  - decorator=5.1.1=pyhd3eb1b0_0
+  - deprecated=1.2.13=py312h06a4308_0
   - draco=1.5.7=h00ab1b0_0
   - eigen=3.4.0=h00ab1b0_0
+  - fabric=3.2.2=pyhd8ed1ab_0
   - fgt=0.4.11=hee0ac4a_0
   - fmt=11.0.2=h434a139_0
   - freexl=2.0.0=h743c826_0
@@ -58,6 +64,7 @@ dependencies:
   - importlib-metadata=8.2.0=pyha770c72_0
   - importlib_metadata=8.2.0=hd8ed1ab_0
   - iniconfig=1.1.1=pyhd3eb1b0_0
+  - invoke=2.2.0=pyhd8ed1ab_0
   - isort=5.13.2=py312h06a4308_0
   - json-c=0.17=h1220068_1
   - kernel-headers_linux-64=3.10.0=h4a8ded7_16
@@ -127,6 +134,7 @@ dependencies:
   - libre2-11=2023.09.01=h5a48ba9_2
   - librttopo=1.1.0=hc670b87_16
   - libsanitizer=12.4.0=h46f95d5_0
+  - libsodium=1.0.18=h7b6447c_0
   - libspatialite=5.1.0=h15fa968_9
   - libsqlite=3.46.0=hde9e2c9_0
   - libssh2=1.11.0=h0841786_0
@@ -164,8 +172,10 @@ dependencies:
   - pluggy=1.0.0=py312h06a4308_1
   - postgresql=16.3=h8e811e2_0
   - proj=9.4.1=h54d7996_1
+  - pycparser=2.21=pyhd3eb1b0_0
   - pyinstaller=6.9.0=py312hed7b099_0
   - pyinstaller-hooks-contrib=2024.7=pyhd8ed1ab_0
+  - pynacl=1.5.0=py312h5eee18b_0
   - pyproj=3.6.1=py312h01329cd_8
   - pytest=7.4.4=py312h06a4308_0
   - python=3.12.5=h2ad013b_0_cpython
@@ -175,6 +185,7 @@ dependencies:
   - readline=8.2=h8228510_1
   - s2n=1.4.17=he19d79f_0
   - setuptools=72.1.0=pyhd8ed1ab_0
+  - six=1.16.0=pyhd3eb1b0_1
   - snappy=1.2.1=ha2e4443_0
   - spdlog=1.14.1=hed91bc2_1
   - sqlite=3.46.0=h6d4b2fc_0
@@ -187,6 +198,7 @@ dependencies:
   - tzdata=2024a=h0c530f3_0
   - uriparser=0.9.8=hac33072_0
   - wheel=0.44.0=pyhd8ed1ab_0
+  - wrapt=1.14.1=py312h5eee18b_0
   - xerces-c=3.2.5=h666cd97_1
   - xz=5.2.6=h166bdaf_0
   - zipp=3.19.2=pyhd8ed1ab_0
@@ -196,6 +208,7 @@ dependencies:
       - charset-normalizer==3.3.2
       - geodepot==2024.1001
       - idna==3.8
+      - paramiko==3.4.1
       - pdal-plugins==1.5.2
       - py-spy==0.3.14
       - requests==2.32.3

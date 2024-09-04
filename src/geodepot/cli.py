@@ -139,7 +139,10 @@ def config_set_cmd(ctx, name, value, global_config):
 def fetch_cmd(ctx, name):
     repo = get_repository(ctx)
     diff_all = repo.fetch(remote=RemoteName(name))
-    ctx.obj["logger"].info(format_indexdiffs(diff_all))
+    if len(diff_all) > 0:
+        ctx.obj["logger"].info("\n" + format_indexdiffs(diff_all))
+    else:
+        ctx.obj["logger"].info(f"No changes detected between '{name}' and local repository.")
 
 
 @command(name="get", help="Return the full local path to the specified data item.")
@@ -193,7 +196,7 @@ def push_cmd(ctx, name, force_yes):
     if force_yes:
         yes_input = True
     else:
-        yes_input = input(f"The remote '{name}' differs from the local repository in the details listed above. Do you want to overwrite the the remote with the local data? [y/n]: ").lower() in ("y", "yes")
+        yes_input = input(f"The remote '{name}' differs from the local repository in the details listed above. Do you want to overwrite the remote with the local data? [y/n]: ").lower() in ("y", "yes")
     if yes_input:
         repo.push(remote=RemoteName(name), diff_all=diff_all)
         ctx.obj["logger"].info(f"Successfully pushed the local changes to '{name}'.")

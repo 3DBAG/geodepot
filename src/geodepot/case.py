@@ -8,7 +8,7 @@ from geodepot.data import Data, DataName
 CaseName = NewType("CaseName", str)
 
 
-@dataclass(repr=True)
+@dataclass(repr=True, order=True, unsafe_hash=True)
 class CaseSpec:
     """Case specifier."""
 
@@ -16,7 +16,20 @@ class CaseSpec:
     data_name: DataName | None = None
 
     def __str__(self):
-        return f"{self.case_name}/{self.data_name}"
+        if self.data_name is None:
+            return str(self.case_name)
+        else:
+            return f"{self.case_name}/{self.data_name}"
+
+    @property
+    def is_data(self):
+        """Does the CaseSpec point to a data item?"""
+        return self.case_name is not None and self.data_name is not None
+
+    @property
+    def is_case(self):
+        """Does the CaseSpec point to a case?"""
+        return self.case_name is not None and self.data_name is None
 
     def to_path(self) -> Path:
         if self.case_name is not None and self.data_name is not None:

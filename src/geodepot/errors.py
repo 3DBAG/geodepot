@@ -4,3 +4,7 @@ class GeodepotRuntimeError(Exception):
 
 class GeodepotInvalidRepository(Exception):
     """Invalid repository, possibly due to missing contents."""
+
+
+class GeodepotInvalidConfiguration(Exception):
+    """Invalid configuration value."""
