@@ -4,8 +4,10 @@ from logging import getLogger
 from pathlib import Path
 from typing import Self, NewType
 
-from geodepot import GEODEPOT_CONFIG_GLOBAL, GEODEPOT_CONFIG_LOCAL
+from geodepot import GEODEPOT_CONFIG_GLOBAL, GEODEPOT_CONFIG_LOCAL, GEODEPOT_INDEX, \
+    GEODEPOT_CASES
 from geodepot.encode import DataClassEncoder
+from geodepot.errors import GeodepotInvalidConfiguration
 
 logger = getLogger(__name__)
 
@@ -39,13 +41,61 @@ def as_user(dct: dict) -> User | dict:
 
 RemoteName = NewType("RemoteName", str)
 
-@dataclass(repr=True)
+
 class Remote:
-    name: str
-    url: str
+
+    def __init__(self, name: str, url: str):
+        self.name = name
+        self.is_ssh = False
+        self.path = None
+        self.url = url
+
 
     def __str__(self):
         return f"{self.name} {self.url}"
+
+    @property
+    def url(self):
+        return self._url
+
+    @url.setter
+    def url(self, url: str):
+        if url.startswith("http://") or url.startswith("https://"):
+            self._url = url
+        else:
+            ssh_parts = None
+            if url.startswith("ssh://"):
+                ssh_parts = url.lstrip("ssh://").split(":")
+            elif url.startswith("sftp://"):
+                ssh_parts = url.lstrip("sftp://").split(":")
+            if ssh_parts is not None:
+                if len(ssh_parts) == 2:
+                    self._url = ssh_parts[0]
+                    self.path = ssh_parts[1]
+                elif len(ssh_parts) == 1:
+                    self._url = ssh_parts[0]
+                    logger.info(f"Expected a remote URL in the form of ssh[sftp]://<url>:<path>, but did not find :<path> in {url}.")
+                else:
+                    raise GeodepotInvalidConfiguration(f"Expected a remote URL in the form of ssh[sftp]://<url>:<path>, but found {url}.")
+                self.is_ssh = True
+        if self._url is None:
+            raise ValueError(f"Could not set Remote url from {url}")
+
+    @property
+    def path_index(self):
+        if self.is_ssh:
+            # In case of SSH, we need the path to the index on the remote filesystem
+            return "/".join([self.path, GEODEPOT_INDEX]) if self.path is not None else GEODEPOT_INDEX
+        else:
+            return "/".join([self.url, GEODEPOT_INDEX])
+
+    @property
+    def path_cases(self):
+        if self.is_ssh:
+            # In case of SSH, we need the path to the index on the remote filesystem
+            return "/".join([self.path, GEODEPOT_CASES]) if self.path is not None else GEODEPOT_CASES
+        else:
+            return "/".join([self.url, GEODEPOT_CASES])
 
     def to_json(self) -> str:
         return dumps(self, cls=DataClassEncoder, indent=JSON_INDENT)

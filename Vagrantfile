@@ -19,7 +19,7 @@ Vagrant.configure("2") do |config|
     server.vm.provision 'shell', inline: "cat /home/vagrant/.ssh/me.pub >> /root/.ssh/authorized_keys"
     server.vm.provision 'shell', inline: "cat /home/vagrant/.ssh/me.pub >> /home/vagrant/.ssh/authorized_keys", privileged: false
     server.vm.synced_folder "tests/data/integration/server", "/srv/geodepot",
-        owner: "root", group: "root"
+        owner: "vagrant", group: "vagrant"
   end
 
   config.vm.define "client0" do |client0|

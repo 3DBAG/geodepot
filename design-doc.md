@@ -762,10 +762,12 @@ git lfs could be sth to use, but maybe overkill because need to set up and opera
 
 ## TODOs
 
-- Sanitize serialize/write_to_file etc.
+- Only print traceback in debug mode
+- ~~Sanitize serialize/write_to_file etc.~~
 - Check again that driver detection works
 - Test with adding `pickle`
 - Add option for providing bbox to `add`
+- Add option for providing srs to `add`, so to try to reproject the original bbox to 3857 from srs
 - Add driver to index
 - Find out diver from format
 - Try building wheels for the deps, so that geodepot is pip-installable

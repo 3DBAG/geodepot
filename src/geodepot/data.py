@@ -303,19 +303,22 @@ class Data:
             bbox = BBox(extent[0], extent[2], extent[1], extent[3])
         else:
             bbox = None
-        extent_original = CreateGeometryFromWkt(
-            feature["data_extent_original_srs"]
-        ).GetEnvelope()
-        df.bbox = BBoxSRS(
-            bbox_epsg_3857=bbox,
-            bbox_original_srs=BBox(
-                extent_original[0],
-                extent_original[2],
-                extent_original[1],
-                extent_original[3],
-            ),
-            srs_wkt=feature["data_srs"],
-        )
+        if feature["data_extent_original_srs"] is not None:
+            extent_original = CreateGeometryFromWkt(
+                feature["data_extent_original_srs"]
+            ).GetEnvelope()
+            df.bbox = BBoxSRS(
+                bbox_epsg_3857=bbox,
+                bbox_original_srs=BBox(
+                    extent_original[0],
+                    extent_original[2],
+                    extent_original[1],
+                    extent_original[3],
+                ),
+                srs_wkt=feature["data_srs"],
+            )
+        else:
+            df.bbox = None
         return df
 
     def to_pretty(self) -> str:

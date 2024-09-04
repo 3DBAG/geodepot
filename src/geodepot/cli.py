@@ -198,8 +198,7 @@ def push_cmd(ctx, name, force_yes):
     else:
         yes_input = input(f"The remote '{name}' differs from the local repository in the details listed above. Do you want to overwrite the remote with the local data? [y/n]: ").lower() in ("y", "yes")
     if yes_input:
-        repo.push(remote=RemoteName(name), diff_all=diff_all)
-        ctx.obj["logger"].info(f"Successfully pushed the local changes to '{name}'.")
+        repo.push(remote_name=RemoteName(name), diff_all=diff_all)
     else:
         ctx.obj["logger"].info("Exiting without pushing the local changes.")
 
