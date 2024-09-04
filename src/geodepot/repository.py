@@ -668,7 +668,7 @@ class Repository:
                 case_archive = f"{data.case_name}.tar"
                 try:
                     result = conn_ssh.run(
-                        f"tar -f {case_archive} -c {data_path_remote}"
+                        f"tar -cf {case_archive} -C {remote.path_cases} {data}"
                     )
                     if not result.ok:
                         logger.error(
@@ -706,7 +706,7 @@ class Repository:
 
         try:
             logger.debug(f"GET local={self.path_index}, remote={remote.path_index}")
-            _ = conn_ssh.get(local=self.path_index, remote=remote.path_index)
+            _ = conn_ssh.get(local=str(self.path_index), remote=str(remote.path_index))
             logger.info(f"Downloaded {GEODEPOT_INDEX} from {remote_name}")
         except Exception as e:
             logger.error(f"Failed to download {GEODEPOT_INDEX} with error: {e}")
