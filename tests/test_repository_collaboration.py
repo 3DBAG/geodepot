@@ -210,3 +210,18 @@ def test_format_indexdiffs(case_wippolder, data_wippolder_gpkg, data_wippolder_g
     diff_all_formatted = format_indexdiffs(diff_all, push=True)
     print()
     print(diff_all_formatted)
+
+
+def test_push_debug():
+    repo = Repository(path="/home/balazs/Development/geodepot/tests/data/integration/client1/.geodepot")
+    diff_all = repo.fetch(RemoteName("ssh"))
+    repo.push(RemoteName("ssh"), diff_all)
+
+
+# def test_format_indexdiffs_debug():
+#     index_local = Index.load(Path("/home/balazs/Development/geodepot/tests/tmp_project/.geodepot/index.geojson"))
+#     index_remote = Index.load(Path("/home/balazs/Development/geodepot/tests/data/integration/server/.geodepot/index.geojson"))
+#     diff_all = index_local.diff(index_remote)
+#     diff_all_formatted = format_indexdiffs(diff_all, push=False)
+#     print()
+#     print(diff_all_formatted)

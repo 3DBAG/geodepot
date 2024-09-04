@@ -4,11 +4,11 @@ from itertools import groupby
 from logging import getLogger
 from pathlib import Path
 from shutil import copy2, copytree, rmtree
+from tarfile import TarFile
 from typing import Self, Any
 from urllib.parse import urlparse
 
 from osgeo.ogr import UseExceptions
-from requests import head as requests_head
 
 from geodepot import (
     GEODEPOT_CONFIG_LOCAL,
@@ -17,11 +17,20 @@ from geodepot import (
     GEODEPOT_CASES,
 )
 from geodepot.case import CaseName, Case, CaseSpec
-from geodepot.config import Config, get_current_user, User, get_config, Remote, \
-    RemoteName
+from geodepot.config import (
+    Config,
+    get_current_user,
+    User,
+    get_config,
+    Remote,
+    RemoteName,
+)
 from geodepot.data import Data
-from geodepot.errors import GeodepotRuntimeError, GeodepotInvalidRepository, \
-    GeodepotInvalidConfiguration
+from geodepot.errors import (
+    GeodepotRuntimeError,
+    GeodepotInvalidRepository,
+    GeodepotInvalidConfiguration,
+)
 
 UseExceptions()
 logger = getLogger(__name__)
@@ -62,7 +71,7 @@ def create_modified_diff(
 def format_indexdiffs(diff_all: list[IndexDiff], push: bool = True) -> str:
     sign_local = "+" if push else "-"
     sign_remote = "-" if push else "+"
-    l_casespec = lambda cs: (cs.casespec_self, cs.status)
+    l_casespec = lambda cs: (cs.casespec_self, cs.casespec_other, cs.status)
     diff_all_sorted = sorted(diff_all, key=l_casespec)
     all_changes = []
     currentuser = get_current_user()
@@ -72,22 +81,36 @@ def format_indexdiffs(diff_all: list[IndexDiff], push: bool = True) -> str:
         indexdiff = next(g)
 
         changes.append(
-            f"{sign_local * 3} local/{indexdiff.casespec_self}    ({currentuser.to_pretty() if currentuser else None})\n{sign_remote * 3} remote/{indexdiff.casespec_other}    ({indexdiff.changed_by_other.to_pretty() if indexdiff.changed_by_other else None})")
+            f"{sign_local * 3} local/{indexdiff.casespec_self}    ({currentuser.to_pretty() if currentuser else None})\n{sign_remote * 3} remote/{indexdiff.casespec_other}    ({indexdiff.changed_by_other.to_pretty() if indexdiff.changed_by_other else None})"
+        )
         if indexdiff.status == Status.MODIFY:
             changes.append(
-                f"{sign_local}{indexdiff.member}={indexdiff.value_self}\n{sign_remote}{indexdiff.member}={indexdiff.value_other}")
+                f"{sign_local}{indexdiff.member}={indexdiff.value_self}\n{sign_remote}{indexdiff.member}={indexdiff.value_other}"
+            )
         # Report the modified values
         for indexdiff in g:
             if indexdiff.status == Status.MODIFY:
                 if indexdiff.member.startswith("bbox"):
-                    wkt_self = None if indexdiff.value_self is None else indexdiff.value_self.to_wkt()
-                    wkt_other = None if indexdiff.value_other is None else indexdiff.value_other.to_wkt()
-                    changes.append(f"{sign_local}{indexdiff.member}={indexdiff.value_self}\n{sign_remote}{indexdiff.member}={indexdiff.value_other}\n{sign_local}{indexdiff.member} (WKT)={wkt_self}\n{sign_remote}{indexdiff.member} (WKT)={wkt_other}")
+                    wkt_self = (
+                        None
+                        if indexdiff.value_self is None
+                        else indexdiff.value_self.to_wkt()
+                    )
+                    wkt_other = (
+                        None
+                        if indexdiff.value_other is None
+                        else indexdiff.value_other.to_wkt()
+                    )
+                    changes.append(
+                        f"{sign_local}{indexdiff.member}={indexdiff.value_self}\n{sign_remote}{indexdiff.member}={indexdiff.value_other}\n{sign_local}{indexdiff.member} (WKT)={wkt_self}\n{sign_remote}{indexdiff.member} (WKT)={wkt_other}"
+                    )
                 else:
                     changes.append(
-                        f"{sign_local}{indexdiff.member}={indexdiff.value_self}\n{sign_remote}{indexdiff.member}={indexdiff.value_other}")
+                        f"{sign_local}{indexdiff.member}={indexdiff.value_self}\n{sign_remote}{indexdiff.member}={indexdiff.value_other}"
+                    )
         all_changes.append("\n\n".join(changes))
     return "\n\n".join(all_changes)
+
 
 # to update index: https://pcjericks.github.io/py-gdalogr-cookbook/vector_layers.html#load-data-to-memory
 @dataclass(repr=True, order=True)
@@ -183,7 +206,9 @@ class Index:
                             )
                         fid += 1
         except Exception as e:
-            logger.critical(f"Failed to serialize index with exception '{e}', repository is probably in an invalid state.")
+            logger.critical(
+                f"Failed to serialize index with exception '{e}', repository is probably in an invalid state."
+            )
 
     @classmethod
     def load(cls, path: Path | str) -> Self | None:
@@ -244,11 +269,17 @@ class Index:
                                             member_name = "srs"
                                             value_self = value_self.srs_wkt
                                             value_other = value_other.srs_wkt
-                                        elif value_self.bbox_original_srs != value_other.bbox_original_srs:
+                                        elif (
+                                            value_self.bbox_original_srs
+                                            != value_other.bbox_original_srs
+                                        ):
                                             member_name = "bbox_original_srs"
                                             value_self = value_self.bbox_original_srs
                                             value_other = value_other.bbox_original_srs
-                                        elif value_self.bbox_epsg_3857 != value_other.bbox_epsg_3857:
+                                        elif (
+                                            value_self.bbox_epsg_3857
+                                            != value_other.bbox_epsg_3857
+                                        ):
                                             member_name = "bbox_epsg_3857"
                                             value_self = value_self.bbox_epsg_3857
                                             value_other = value_other.bbox_epsg_3857
@@ -437,7 +468,9 @@ class Repository:
             try:
                 case = self.init_case(casespec)
             except FileExistsError as e:
-                raise GeodepotInvalidRepository(f"The data for {casespec} is in the repository, but the index does not contain an entry for {casespec}. Try manually removing {casespec} from {self.path_cases} and re-adding it with 'geodepot add'.")
+                raise GeodepotInvalidRepository(
+                    f"The data for {casespec} is in the repository, but the index does not contain an entry for {casespec}. Try manually removing {casespec} from {self.path_cases} and re-adding it with 'geodepot add'."
+                )
         # Update the description of an existing case
         if case_description is not None:
             case.description = case_description
@@ -555,7 +588,7 @@ class Repository:
 
     def load_config(self):
         """Load the configuration."""
-        self.config = get_config()
+        self.config = get_config(local_config=self.path_config_local)
 
     def load_index(self, remote: RemoteName | None = None):
         """Load the index.
@@ -565,50 +598,147 @@ class Repository:
         if remote is None:
             self.index = Index.load(self.path_index)
             if self.index is None:
-                raise GeodepotInvalidRepository(f"Could not load index from {self.path_index}")
+                raise GeodepotInvalidRepository(
+                    f"Could not load index from {self.path_index}"
+                )
         else:
             remote = self.config.remotes.get(remote)
             if remote is None:
-                raise GeodepotInvalidRepository(f"The remote '{remote}' is not configured for this repository. You can add it with 'remote add'.")
+                raise GeodepotInvalidRepository(
+                    f"The remote '{remote}' is not configured for this repository. You can add it with 'remote add'."
+                )
 
             remote_index_path = remote.path_index
             # If the URL is ssh, then the remote_index_url is the file path on the remote server
             if remote.is_ssh:
                 # GDAL cannot handle ssh/sftp
                 from fabric import Connection
+
                 ssh_conn = Connection(remote.url)
                 remote_index_locally = self.path / f"remote_{GEODEPOT_INDEX}"
                 try:
-                    result = ssh_conn.get(remote=str(remote_index_path),
-                                          local=str(remote_index_locally))
+                    result = ssh_conn.get(
+                        remote=str(remote_index_path), local=str(remote_index_locally)
+                    )
                     remote_index_url = Path(result.local)
                 except Exception as e:
-                    raise GeodepotInvalidRepository(f"The remote '{remote}' cannot be accessed or does not contain a {GEODEPOT_INDEX} at {remote_index_path}. With:\n{e}")
+                    raise GeodepotInvalidRepository(
+                        f"The remote '{remote}' cannot be accessed or does not contain a {GEODEPOT_INDEX} at {remote_index_path}. With:\n{e}"
+                    )
             else:
                 remote_index_url = remote_index_path
             if remote_index_url is not None:
                 self.index_remote = Index.load(remote_index_url)
             else:
-                raise GeodepotRuntimeError(f"Something went wrong, could not load the index from {remote.url}.")
+                raise GeodepotRuntimeError(
+                    f"Something went wrong, could not load the index from {remote.url}."
+                )
+
+    def pull(self, remote_name: RemoteName, diff_all: list[IndexDiff]):
+        """Overwrite the local repository with the changes in the remote."""
+        remote = self.config.remotes.get(remote_name)
+        if remote is None:
+            raise GeodepotInvalidConfiguration(
+                f"The remote '{remote_name}' is not configured for this repository."
+            )
+        if not remote.is_ssh:
+            raise GeodepotInvalidConfiguration(
+                f"The remote '{remote}' must use an ssh/sftp protocol in order to pull changes."
+            )
+
+        from fabric import Connection
+
+        # See comments in 'push'. Here we do the opposite, because we overwrite the
+        # local with the remote.
+        data_to_download = set(
+            i.casespec_other
+            for i in diff_all
+            if i.status == Status.ADD or i.status == Status.MODIFY
+        )
+        data_to_delete = set(
+            i.casespec_self for i in diff_all if i.status == Status.DELETE
+        )
+
+        conn_ssh = Connection(remote.url)
+
+        for data in data_to_download:
+            data_path_local = self.path_cases.joinpath(data.to_path())
+            data_path_remote = "/".join([remote.path_cases, str(data)])
+            if data.is_case:
+                case_archive = f"{data.case_name}.tar"
+                try:
+                    result = conn_ssh.run(
+                        f"tar -f {case_archive} -c {data_path_remote}"
+                    )
+                    if not result.ok:
+                        logger.error(
+                            f"Failed to tar {data} on remote {remote.name} with:\n{result.stderr}"
+                        )
+                    local_case_archive = self.path_cases / case_archive
+                    _ = conn_ssh.get(local=str(local_case_archive), remote=case_archive)
+                    with TarFile(local_case_archive) as tf:
+                        tf.extractall(path=self.path_cases)
+                    local_case_archive.unlink()
+                except Exception as e:
+                    logger.error(
+                        f"Failed to download {data} from remote {remote.name} with:\n{e}"
+                    )
+            else:
+                logger.debug(f"GET local={data_path_local} remote={data_path_remote}")
+                try:
+                    _ = conn_ssh.get(local=data_path_local, remote=data_path_remote)
+                    logger.info(f"Downloaded {data} from {remote.name}")
+                except Exception as e:
+                    logger.error(
+                        f"Failed to download {data} from {remote.name} with:\n{e}"
+                    )
+        for data in data_to_delete:
+            if data.is_case:
+                try:
+                    rmtree(self.path_cases.joinpath(data.to_path()))
+                except Exception as e:
+                    logger.error(f"Failed to delete local {data} with error: {e}")
+            else:
+                try:
+                    self.path_cases.joinpath(data.to_path()).unlink()
+                except Exception as e:
+                    logger.error(f"Failed to delete local {data} with error: {e}")
+
+        try:
+            logger.debug(f"GET local={self.path_index}, remote={remote.path_index}")
+            _ = conn_ssh.get(local=self.path_index, remote=remote.path_index)
+            logger.info(f"Downloaded {GEODEPOT_INDEX} from {remote_name}")
+        except Exception as e:
+            logger.error(f"Failed to download {GEODEPOT_INDEX} with error: {e}")
 
     def push(self, remote_name: RemoteName, diff_all: list[IndexDiff]):
         """Overwrite the remote repository with the changes in the local."""
         remote = self.config.remotes.get(remote_name)
         if remote is None:
-            raise GeodepotInvalidConfiguration(f"The remote '{remote_name}' is not configured for this repository.")
+            raise GeodepotInvalidConfiguration(
+                f"The remote '{remote_name}' is not configured for this repository."
+            )
         if not remote.is_ssh:
-            raise GeodepotInvalidConfiguration(f"The remote '{remote}' must use an ssh/sftp protocol in order to push changes.")
+            raise GeodepotInvalidConfiguration(
+                f"The remote '{remote}' must use an ssh/sftp protocol in order to push changes."
+            )
 
         from fabric import Connection
 
         # i.status == Status.DELETE, because if the remote does not contain a data, it
         # shows as it deleted it
-        data_to_upload = set(i.casespec_self for i in diff_all if i.status == Status.DELETE or i.status == Status.MODIFY)
+        data_to_upload = set(
+            i.casespec_self
+            for i in diff_all
+            if i.status == Status.DELETE or i.status == Status.MODIFY
+        )
         # Similarly, i.status == Status.ADD, because the remote contains a data that the
         # local doesn't, thus it 'adds' it w.r.t to the local. Since we push, we
         # overwrite the remote, meaning that if the local doesn't contain a specific
         # data, the remote shouldn't have it either.
-        data_to_delete = set(i.casespec_other for i in diff_all if i.status == Status.ADD)
+        data_to_delete = set(
+            i.casespec_other for i in diff_all if i.status == Status.ADD
+        )
 
         conn_ssh = Connection(remote.url)
 
@@ -618,33 +748,52 @@ class Repository:
             if data.is_case:
                 # Upload a whole case
                 for dirpath, dirnames, filenames in data_path_local.walk():
+                    relpath = dirpath.relative_to(self.path_cases)
+                    remote_path = "/".join([remote.path_cases, str(relpath)])
+                    try:
+                        result = conn_ssh.run(f"mkdir -p {remote_path}")
+                        if not result.ok:
+                            logger.error(
+                                f"Failed to create directory {relpath} on {remote.name} with:\n{result.stderr}"
+                            )
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to create directory {relpath} on {remote.name} with:\n{e}:"
+                        )
+
                     for d in dirnames:
                         local_path = dirpath / d
-                        relpath = local_path.relative_to(data_path_local)
+                        relpath = local_path.relative_to(self.path_cases)
                         remote_path = "/".join([remote.path_cases, str(relpath)])
                         try:
                             result = conn_ssh.run(f"mkdir -p {remote_path}")
                             if not result.ok:
                                 logger.error(
-                                    f"Failed to create directory {d} on {remote.name} with:\n{result.stderr}")
+                                    f"Failed to create directory {d} on {remote.name} with:\n{result.stderr}"
+                                )
                         except Exception as e:
-                            logger.error(f"Failed to create directory {d} on {remote.name} with:\n{e}:")
+                            logger.error(
+                                f"Failed to create directory {d} on {remote.name} with:\n{e}:"
+                            )
 
                     for filename in filenames:
                         local_path = dirpath / filename
-                        relpath = local_path.relative_to(data_path_local)
+                        relpath = local_path.relative_to(self.path_cases)
                         remote_path = "/".join([remote.path_cases, str(relpath)])
                         try:
                             logger.debug(f"PUT local={local_path} remote={remote_path}")
-                            _ = conn_ssh.put(local=local_path,
-                                                  remote=remote_path)
+                            _ = conn_ssh.put(local=local_path, remote=remote_path)
                             logger.info(f"Uploaded {data} to {remote.name}")
                         except Exception as e:
-                            logger.error(f"Failed to upload {data} to {remote.name} with:\n{e}")
+                            logger.error(
+                                f"Failed to upload {data} to {remote.name} with:\n{e}"
+                            )
             else:
                 # Upload a single data file
                 try:
-                    logger.debug(f"PUT local={data_path_local} remote={data_path_remote}")
+                    logger.debug(
+                        f"PUT local={data_path_local} remote={data_path_remote}"
+                    )
                     _ = conn_ssh.put(local=data_path_local, remote=data_path_remote)
                     logger.info(f"Uploaded {data} to {remote.name}")
                 except Exception as e:
@@ -660,7 +809,9 @@ class Repository:
                     result = conn_ssh.run(f"rm {data_path_remote}")
 
                 if not result.ok:
-                    logger.error(f"Failed to delete {data} on {remote.name} with:\n{result.stderr}")
+                    logger.error(
+                        f"Failed to delete {data} on {remote.name} with:\n{result.stderr}"
+                    )
                 else:
                     logger.info(f"Deleted {data} on {remote.name}")
             except Exception as e:
@@ -671,52 +822,9 @@ class Repository:
             _ = conn_ssh.put(self.path_index, remote=remote.path_index)
             logger.info(f"Transferred {GEODEPOT_INDEX} to {remote.name}")
         except Exception as e:
-            logger.error(f"Failed to transfer {GEODEPOT_INDEX} to {remote.name} with:\n{e}")
-
-    def pull(self, remote: RemoteName, diff_all: list[IndexDiff]):
-        """Overwrite the local repository with the changes in the remote."""
-        from fabric import Connection
-
-        # See comments in 'push'. Here we do the opposite, because we overwrite the
-        # local with the remote.
-        data_to_download = set(i.casespec_other for i in diff_all if i.status == Status.ADD or i.status == Status.MODIFY)
-        data_to_delete = set(i.casespec_self for i in diff_all if i.status == Status.DELETE)
-
-        path_remote_cases = "/".join([self.config.remotes[remote].url, GEODEPOT_CASES])
-        conn_ssh = Connection(self.config.remotes[remote].url)
-
-        # todo: implement complete case transfer and delete
-        for data in data_to_download:
-            data_path_local = self.path_cases.joinpath(data.to_path())
-            data_path_remote = "/".join([path_remote_cases, str(data)])
-            if data.is_case:
-                data_path_remote
-                result = conn_ssh.run(f"zip -1 -r {data.case_name}.zip")
-                pass
-            else:
-                result = conn_ssh.get(local=data_path_local, remote=data_path_remote)
-                if not result.ok:
-                    logger.error(f"Failed to download {data} from {remote}")
-                else:
-                    logger.info(f"Downloaded {data} from {remote}")
-        for data in data_to_delete:
-            if data.is_case:
-                try:
-                    rmtree(self.path_cases.joinpath(data.to_path()))
-                except Exception as e:
-                    logger.error(f"Failed to delete local {data} with error: {e}")
-            else:
-                try:
-                    self.path_cases.joinpath(data.to_path()).unlink()
-                except Exception as e:
-                    logger.error(f"Failed to delete local {data} with error: {e}")
-
-        path_remote_index = "/".join([self.config.remotes[remote].url, GEODEPOT_INDEX])
-        result = conn_ssh.get(local=self.path_index, remote=path_remote_index)
-        if not result.ok:
-            logger.error(f"Failed to download {GEODEPOT_INDEX} from {remote}")
-        else:
-            logger.info(f"Downloaded {GEODEPOT_INDEX} from {remote}")
+            logger.error(
+                f"Failed to transfer {GEODEPOT_INDEX} to {remote.name} with:\n{e}"
+            )
 
     def remove(self, casespec: CaseSpec):
         """Remove an entry from the repository."""

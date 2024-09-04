@@ -225,19 +225,22 @@ def get_local_config_path() -> Path | None:
         return local_config_path
 
 
-def get_local_config() -> Config | None:
-    if (local_config_path := get_local_config_path()) is not None:
-        return Config.load(local_config_path)
+def get_local_config(path: Path | None = None) -> Config | None:
+    if path is None:
+        if (local_config_path := get_local_config_path()) is not None:
+            return Config.load(local_config_path)
+    else:
+        return Config.load(path)
 
 
-def get_config() -> Config:
+def get_config(local_config: Path | None = None) -> Config:
     """Load the Geoflow configuration.
 
     The local configuration is merged into the global configuration, so that local
     values overwrite global values.
     """
     config = get_global_config()
-    local_config = get_local_config()
+    local_config = get_local_config(path=local_config)
     if config is None and local_config is None:
         logger.error(
             "Could not load the global nor a local configuration, using an empty config"

@@ -44,6 +44,7 @@ class BBox:
     def to_ogr_geometry_wkbpolygon(self):
         """Convert to an OGR Geometry that is a wkbPolygon."""
         from osgeo.ogr import Geometry, wkbPolygon, wkbLinearRing
+
         ring = Geometry(wkbLinearRing)
         ring.AddPoint_2D(self.minx, self.miny)
         ring.AddPoint_2D(self.maxx, self.miny)
@@ -138,6 +139,7 @@ class Data:
 
     def _compute_bbox(self, path: Path) -> BBoxSRS:
         from osgeo.osr import SpatialReference, CreateCoordinateTransformation
+
         target_epsg = GEODEPOT_INDEX_EPSG
         pseudo_mercator = SpatialReference()
         pseudo_mercator.ImportFromEPSG(target_epsg)
@@ -194,6 +196,7 @@ class Data:
                     )
         elif self.driver == Drivers.GDAL:
             from osgeo.gdal import OpenEx as gdalOpenEx
+
             with gdalOpenEx(path) as gdal_dataset:
                 bbox_srs = BBoxSRS()
                 srs = gdal_dataset.GetSpatialRef()
@@ -210,7 +213,9 @@ class Data:
                         extent[0], extent[1], extent[2], extent[3]
                     )
                 else:
-                    logger.info(f"Could not find the affine transformation parameters of {path} and could not calculate its extent.")
+                    logger.info(
+                        f"Could not find the affine transformation parameters of {path} and could not calculate its extent."
+                    )
                 if srs is not None and geotransform is not None:
                     bbox_srs.srs_wkt = srs.ExportToWkt()
                     try:
@@ -231,6 +236,7 @@ class Data:
                 return bbox_srs
         elif self.driver == Drivers.OGR:
             from osgeo.ogr import Open as ogrOpen
+
             with ogrOpen(path) as ogr_dataset:
                 lyr = ogr_dataset.GetLayer(0)
                 srs = lyr.GetSpatialRef()
@@ -258,6 +264,7 @@ class Data:
                 return bbox_srs
         elif self.driver == Drivers.PDAL:
             from pdal import Pipeline
+
             pdal_pipeline = Pipeline(dumps([str(path), pdal_filter_stats]))
             pdal_pipeline.execute()
             stats = pdal_pipeline.metadata["metadata"]["filters.stats"]["statistic"]
@@ -291,6 +298,7 @@ class Data:
     @classmethod
     def from_ogr_feature(cls, feature) -> Self:
         from osgeo.ogr import CreateGeometryFromWkt
+
         df = cls.__new__(cls)
         df.name = DataName(feature["data_name"])
         df.sha1 = feature["data_sha1"]
@@ -328,16 +336,23 @@ class Data:
             srs_wkt = bbox.srs_wkt
             if bbox.bbox_original_srs is not None:
                 bbox_wkt = bbox.bbox_original_srs.to_wkt()
-        output = [f"NAME={self.name}", f"\nDESCRIPTION={self.description}", f"\nformat={self.format}",
-                  f"driver={self.driver}", f"license={self.license}",
-                  f"sha1={self.sha1}", f"changed_by={self.changed_by.to_pretty() if self.changed_by is not None else None}",
-                  f"extent={bbox_wkt}",
-                  f"srs={srs_wkt}"]
+        output = [
+            f"NAME={self.name}",
+            f"\nDESCRIPTION={self.description}",
+            f"\nformat={self.format}",
+            f"driver={self.driver}",
+            f"license={self.license}",
+            f"sha1={self.sha1}",
+            f"changed_by={self.changed_by.to_pretty() if self.changed_by is not None else None}",
+            f"extent={bbox_wkt}",
+            f"srs={srs_wkt}",
+        ]
         return "\n".join(output)
 
 
 def try_pdal(path: Path) -> str | None:
     from pdal import Reader
+
     try:
         reader = Reader(path)
         if reader.type is not None and reader.type != "":
@@ -350,6 +365,7 @@ def try_pdal(path: Path) -> str | None:
 
 def try_ogr(path: Path) -> str | None:
     from osgeo.ogr import Open as ogrOpen
+
     try:
         with ogrOpen(path) as ogr_dataset:
             return ogr_dataset.GetDriver().GetName()
@@ -359,6 +375,7 @@ def try_ogr(path: Path) -> str | None:
 
 def try_gdal(path: Path) -> str | None:
     from osgeo.gdal import OpenEx as gdalOpenEx
+
     try:
         with gdalOpenEx(path) as gdal_dataset:
             lname = gdal_dataset.GetDriver().LongName

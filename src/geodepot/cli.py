@@ -18,7 +18,6 @@ from geodepot.config import (
     remote_add,
     remote_remove, RemoteName,
 )
-from geodepot.data import logger
 from geodepot.errors import GeodepotInvalidRepository
 from geodepot.repository import Repository, format_indexdiffs
 
@@ -142,7 +141,7 @@ def fetch_cmd(ctx, name):
     if len(diff_all) > 0:
         ctx.obj["logger"].info("\n" + format_indexdiffs(diff_all))
     else:
-        ctx.obj["logger"].info(f"No changes detected between '{name}' and local repository.")
+        ctx.obj["logger"].info(f"No changes detected between the remote '{name}' and the local repository.")
 
 
 @command(name="get", help="Return the full local path to the specified data item.")
@@ -170,16 +169,33 @@ def init_cmd(ctx, url):
 @pass_context
 def list_cmd(ctx):
     repo = get_repository(ctx)
+    if len(repo.cases) == 0:
+        ctx.obj["logger"].info("Repository is empty.")
     for case_name, case in repo.cases.items():
         print(f"{case_name}")
         for data_name, data in case.data.items():
             print(f"\t/{data_name}")
 
 
-@command(name="pull")
+@command(name="pull", help="Downloads the remote changes to the local repository, overwriting the local.")
+@argument("name")
+@option("-y", "--yes", "force_yes", is_flag=True, default=False, help="Skip confirmation before overwriting the local.")
 @pass_context
-def pull_cmd(ctx):
+def pull_cmd(ctx, name, force_yes):
     repo = get_repository(ctx)
+    diff_all = repo.fetch(remote=RemoteName(name))
+    if len(diff_all) == 0:
+        ctx.obj["logger"].info("No changes detected. Exiting.")
+        return True
+    ctx.obj["logger"].info("\n\n" + format_indexdiffs(diff_all, push=False))
+    if force_yes:
+        yes_input = True
+    else:
+        yes_input = input(f"The local differs from the remote '{name}' repository in the details listed above. Do you want to overwrite the local with the remote data? [y/n]: ").lower() in ("y", "yes")
+    if yes_input:
+        repo.pull(remote_name=RemoteName(name), diff_all=diff_all)
+    else:
+        ctx.obj["logger"].info("Exiting without pulling the remote changes.")
 
 
 @command(name="push", help="Uploads the local changes to the remote repository, overwriting the remote.")
@@ -192,7 +208,7 @@ def push_cmd(ctx, name, force_yes):
     if len(diff_all) == 0:
         ctx.obj["logger"].info("No changes detected. Exiting.")
         return True
-    ctx.obj["logger"].info("\n\n" + format_indexdiffs(diff_all))
+    ctx.obj["logger"].info("\n\n" + format_indexdiffs(diff_all, push=True))
     if force_yes:
         yes_input = True
     else:
