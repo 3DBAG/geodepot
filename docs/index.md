@@ -1,4 +1,4 @@
-# Geodepot – Spatial test data management system
+# Geodepot – Test data storage system for geospatial data
 
 Spatial data processing software are often tested against real-world data that is difficult to fake.
 Consider for example a particularly nasty polygon or a particular configuration of triangles.

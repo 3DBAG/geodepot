@@ -1,4 +1,4 @@
-# Geodepot – Spatial test data management system
+# Geodepot – Test data storage system for geospatial data
 
 Geodepot helps to organize data into test cases, share them and provide integration to some of the test frameworks for ease of use.
 It was born from our own requirement from writing spatial data processing tools over the past years.
