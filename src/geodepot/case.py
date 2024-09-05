@@ -51,18 +51,30 @@ class Case:
 
     changed_by: The User that made the last modification on the case.
     """
+
     name: CaseName
     description: str | None
     sha1: str | None = None
     data: dict[DataName, Data] = field(default_factory=dict)
     changed_by: User | None = None
 
-    def add_from_path(self, source_path: Path, casespec: CaseSpec = None,
-                      data_license: str = None, data_format: str = None,
-                      data_description: str = None, data_changed_by: User = None) -> Data:
-        data = Data(source_path, data_license=data_license, data_format=data_format,
-                  description=data_description, changed_by=data_changed_by,
-                  data_name=casespec.data_name if casespec is not None else None)
+    def add_from_path(
+        self,
+        source_path: Path,
+        casespec: CaseSpec = None,
+        data_license: str = None,
+        data_format: str = None,
+        data_description: str = None,
+        data_changed_by: User = None,
+    ) -> Data:
+        data = Data(
+            source_path,
+            data_license=data_license,
+            data_format=data_format,
+            description=data_description,
+            changed_by=data_changed_by,
+            data_name=casespec.data_name if casespec is not None else None,
+        )
         self.add_data(data)
         return data
 
@@ -79,8 +91,13 @@ class Case:
         return self.data.pop(name, None)
 
     def to_pretty(self) -> str:
-        output = [f"NAME={self.name}", f"\nDESCRIPTION={self.description}", f"\nnr_data_items={len(self.data)}",
-                  f"sha1={self.sha1}", f"changed_by={self.changed_by.to_pretty()}"]
+        output = [
+            f"NAME={self.name}",
+            f"\nDESCRIPTION={self.description}",
+            f"\nnr_data_items={len(self.data)}",
+            f"sha1={self.sha1}",
+            f"changed_by={self.changed_by.to_pretty()}",
+        ]
         return "\n".join(output)
 
     def compress(self):

@@ -2,8 +2,10 @@ from copy import deepcopy
 
 import pytest
 
+from geodepot.repository import Repository, Index
+from geodepot.case import CaseSpec, CaseName
 from geodepot.data import DataName
-from geodepot.repository import *
+from geodepot.config import RemoteName
 
 
 @pytest.fixture(scope="function")
@@ -45,7 +47,9 @@ def test_empty(repo):
 
 
 def test_init_from_url(mock_temp_project):
-    repo = Repository(path="https://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot")
+    repo = Repository(
+        path="https://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot"
+    )
     assert repo.path.exists()
     assert repo.path_index.exists()
     assert repo.path_cases.exists()
@@ -72,7 +76,9 @@ def test_index_load(data_dir):
 
 
 def test_index_load_remote(repo):
-    repo.config.add_remote("origin", "https://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot")
+    repo.config.add_remote(
+        "origin", "https://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot"
+    )
     repo.load_index(remote=RemoteName("origin"))
     assert repo.index_remote is not None
     assert CaseName("wippolder") in repo.index_remote.cases
@@ -87,9 +93,7 @@ def test_add_files(repo, wippolder_dir):
         license="CC-0",
     )
     assert (
-        repo.get_data(
-            CaseSpec(CaseName("wippolder"), DataName("wippolder.gpkg"))
-        )
+        repo.get_data(CaseSpec(CaseName("wippolder"), DataName("wippolder.gpkg")))
         is not None
     )
     assert (repo.path_cases / "wippolder" / "wippolder.gpkg").exists()
@@ -101,9 +105,7 @@ def test_add_files(repo, wippolder_dir):
         license="CC-0",
     )
     assert (
-        repo.get_data(
-            CaseSpec(CaseName("wippolder"), DataName("wippolder.las"))
-        )
+        repo.get_data(CaseSpec(CaseName("wippolder"), DataName("wippolder.las")))
         is not None
     )
     assert (repo.path_cases / "wippolder" / "wippolder.las").exists()
@@ -167,8 +169,11 @@ def test_add_license_data(repo, wippolder_dir):
     assert df_old.license is None
     assert df_updated.license == "CC-0"
 
+
 def test_get_remote(mock_temp_project):
     """Can we get a data item from the remote repository?"""
-    repo = Repository(path="https://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot")
+    repo = Repository(
+        path="https://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot"
+    )
     data_path = repo.get_data_path(CaseSpec("wippolder", "wippolder.gpkg"))
     assert data_path.exists()

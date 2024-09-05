@@ -25,10 +25,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pyinstaller", "black", "isort", "mkdocs", "mkdocs-material"]
+dev = ["pytest", "pyinstaller", "ruff", "mkdocs", "mkdocs-material"]
 
 [project.scripts]
 geodepot = "geodepot:cli.geodepot_grp"
 
-[tool.isort]
-profile = "black"
+[tool.ruff]
+src = ["src", "tests"]

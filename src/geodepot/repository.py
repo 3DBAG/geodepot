@@ -71,7 +71,10 @@ def create_modified_diff(
 def format_indexdiffs(diff_all: list[IndexDiff], push: bool = True) -> str:
     sign_local = "+" if push else "-"
     sign_remote = "-" if push else "+"
-    l_casespec = lambda cs: (cs.casespec_self, cs.casespec_other, cs.status)
+
+    def l_casespec(cs):
+        return cs.casespec_self, cs.casespec_other, cs.status
+
     diff_all_sorted = sorted(diff_all, key=l_casespec)
     all_changes = []
     currentuser = get_current_user()
@@ -467,7 +470,7 @@ class Repository:
         if (case := self.get_case(casespec)) is None:
             try:
                 case = self.init_case(casespec)
-            except FileExistsError as e:
+            except FileExistsError:
                 raise GeodepotInvalidRepository(
                     f"The data for {casespec} is in the repository, but the index does not contain an entry for {casespec}. Try manually removing {casespec} from {self.path_cases} and re-adding it with 'geodepot add'."
                 )

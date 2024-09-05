@@ -16,7 +16,8 @@ from geodepot.config import (
     configure,
     remote_list,
     remote_add,
-    remote_remove, RemoteName,
+    remote_remove,
+    RemoteName,
 )
 from geodepot.errors import GeodepotInvalidRepository
 from geodepot.repository import Repository, format_indexdiffs
@@ -54,7 +55,12 @@ def geodepot_grp(ctx, verbose):
     "data_format",
     help="A format to force on the data in case it cannot be inferred automatically, or the inferred format is not correct.",
 )
-@option("--as-data", is_flag=True, default=False, help="Add a whole directory as a single data entry.")
+@option(
+    "--as-data",
+    is_flag=True,
+    default=False,
+    help="Add a whole directory as a single data entry.",
+)
 @pass_context
 def add_cmd(ctx, casespec, path, data_license, description, data_format, as_data):
     repo = get_repository(ctx)
@@ -141,7 +147,9 @@ def fetch_cmd(ctx, name):
     if len(diff_all) > 0:
         ctx.obj["logger"].info("\n" + format_indexdiffs(diff_all))
     else:
-        ctx.obj["logger"].info(f"No changes detected between the remote '{name}' and the local repository.")
+        ctx.obj["logger"].info(
+            f"No changes detected between the remote '{name}' and the local repository."
+        )
 
 
 @command(name="get", help="Return the full local path to the specified data item.")
@@ -177,9 +185,19 @@ def list_cmd(ctx):
             print(f"\t/{data_name}")
 
 
-@command(name="pull", help="Downloads the remote changes to the local repository, overwriting the local.")
+@command(
+    name="pull",
+    help="Downloads the remote changes to the local repository, overwriting the local.",
+)
 @argument("name")
-@option("-y", "--yes", "force_yes", is_flag=True, default=False, help="Skip confirmation before overwriting the local.")
+@option(
+    "-y",
+    "--yes",
+    "force_yes",
+    is_flag=True,
+    default=False,
+    help="Skip confirmation before overwriting the local.",
+)
 @pass_context
 def pull_cmd(ctx, name, force_yes):
     repo = get_repository(ctx)
@@ -191,16 +209,28 @@ def pull_cmd(ctx, name, force_yes):
     if force_yes:
         yes_input = True
     else:
-        yes_input = input(f"The local differs from the remote '{name}' repository in the details listed above. Do you want to overwrite the local with the remote data? [y/n]: ").lower() in ("y", "yes")
+        yes_input = input(
+            f"The local differs from the remote '{name}' repository in the details listed above. Do you want to overwrite the local with the remote data? [y/n]: "
+        ).lower() in ("y", "yes")
     if yes_input:
         repo.pull(remote_name=RemoteName(name), diff_all=diff_all)
     else:
         ctx.obj["logger"].info("Exiting without pulling the remote changes.")
 
 
-@command(name="push", help="Uploads the local changes to the remote repository, overwriting the remote.")
+@command(
+    name="push",
+    help="Uploads the local changes to the remote repository, overwriting the remote.",
+)
 @argument("name")
-@option("-y", "--yes", "force_yes", is_flag=True, default=False, help="Skip confirmation before overwriting the remote.")
+@option(
+    "-y",
+    "--yes",
+    "force_yes",
+    is_flag=True,
+    default=False,
+    help="Skip confirmation before overwriting the remote.",
+)
 @pass_context
 def push_cmd(ctx, name, force_yes):
     repo = get_repository(ctx)
@@ -212,7 +242,9 @@ def push_cmd(ctx, name, force_yes):
     if force_yes:
         yes_input = True
     else:
-        yes_input = input(f"The remote '{name}' differs from the local repository in the details listed above. Do you want to overwrite the remote with the local data? [y/n]: ").lower() in ("y", "yes")
+        yes_input = input(
+            f"The remote '{name}' differs from the local repository in the details listed above. Do you want to overwrite the remote with the local data? [y/n]: "
+        ).lower() in ("y", "yes")
     if yes_input:
         repo.push(remote_name=RemoteName(name), diff_all=diff_all)
     else:
@@ -279,12 +311,6 @@ def show_cmd(ctx, casespec):
                 ctx.obj["logger"].info("\n" + data.to_pretty())
 
 
-@command(name="verify")
-@pass_context
-def verify_cmd(ctx):
-    repo = get_repository(ctx)
-
-
 def get_repository(ctx: Context) -> Repository:
     try:
         return Repository()
@@ -304,7 +330,6 @@ geodepot_grp.add_command(push_cmd)
 geodepot_grp.add_command(remote_grp)
 geodepot_grp.add_command(remove_cmd)
 geodepot_grp.add_command(show_cmd)
-geodepot_grp.add_command(verify_cmd)
 
 if __name__ == "__main__":
     geodepot_grp()

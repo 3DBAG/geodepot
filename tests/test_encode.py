@@ -1,7 +1,7 @@
 import json
 
 from geodepot.config import Config, User
-from geodepot.encode import *
+from geodepot.encode import DataClassEncoder
 
 
 def test_encode_dataclass_empty():

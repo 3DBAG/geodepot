@@ -5,25 +5,31 @@ from json import dumps
 
 UseExceptions()
 
-pdal_filter_stats = {
-    "type": "filters.stats",
-    "dimensions": "X,Y"
-}
+pdal_filter_stats = {"type": "filters.stats", "dimensions": "X,Y"}
 
 path_pdal = "/home/balazs/Development/geodepot/tests/data/wippolder.las"
 path_gdal = "/home/balazs/Development/geodepot/tests/data/wippolder.gpkg"
 
+
 @command()
-@argument('path_gdal')
-@argument('path_pdal')
+@argument("path_gdal")
+@argument("path_pdal")
 def info(path_gdal, path_pdal):
     echo("version 3")
     pdal_pipeline = Pipeline(dumps([path_pdal, pdal_filter_stats]))
     pdal_pipeline.execute()
-    x_max = pdal_pipeline.metadata["metadata"]["filters.stats"]["statistic"][0]["maximum"]
-    x_min = pdal_pipeline.metadata["metadata"]["filters.stats"]["statistic"][0]["minimum"]
-    y_max = pdal_pipeline.metadata["metadata"]["filters.stats"]["statistic"][1]["maximum"]
-    y_min = pdal_pipeline.metadata["metadata"]["filters.stats"]["statistic"][1]["minimum"]
+    x_max = pdal_pipeline.metadata["metadata"]["filters.stats"]["statistic"][0][
+        "maximum"
+    ]
+    x_min = pdal_pipeline.metadata["metadata"]["filters.stats"]["statistic"][0][
+        "minimum"
+    ]
+    y_max = pdal_pipeline.metadata["metadata"]["filters.stats"]["statistic"][1][
+        "maximum"
+    ]
+    y_min = pdal_pipeline.metadata["metadata"]["filters.stats"]["statistic"][1][
+        "minimum"
+    ]
     echo(f"Point cloud bbox: {x_min} {y_min} {x_max} {y_max}")
     echo(f"Point cloud CRS: {pdal_pipeline.srswkt2}")
 
@@ -33,5 +39,5 @@ def info(path_gdal, path_pdal):
         echo(f"OGR spatial reference: {lyr.GetSpatialRef().ExportToWkt()}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     info()

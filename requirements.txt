@@ -7,5 +7,3 @@ fabric
 # Dev
 pytest
 pyinstaller
-black
-isort

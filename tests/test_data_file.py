@@ -1,10 +1,11 @@
 import pytest
 
-from geodepot.data import *
+from geodepot.data import Data, is_cityjson, try_ogr, try_pdal
 
 
 @pytest.mark.parametrize(
-    "file_name", ("wippolder.gpkg", "wippolder.las", "3dbag_one.city.json", "wippolder.tif")
+    "file_name",
+    ("wippolder.gpkg", "wippolder.las", "3dbag_one.city.json", "wippolder.tif"),
 )
 def test_data_file(mock_proj_lib, wippolder_dir, file_name):
     """Can we initialize a DataFile from a local file?"""
@@ -13,7 +14,6 @@ def test_data_file(mock_proj_lib, wippolder_dir, file_name):
 
 
 class TestFormatInference:
-
     @pytest.mark.parametrize(
         "suffixes,expected",
         (

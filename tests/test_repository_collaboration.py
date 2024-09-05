@@ -1,9 +1,12 @@
 from copy import deepcopy
+from pathlib import Path
 
 import pytest
 
-from geodepot.data import DataName, BBoxSRS, BBox, Drivers
-from geodepot.repository import *
+from geodepot.repository import Repository, Index, Status, format_indexdiffs
+from geodepot.case import CaseName, Case
+from geodepot.data import Data, DataName, BBoxSRS, BBox, Drivers
+from geodepot.config import RemoteName, User
 
 
 @pytest.fixture
@@ -17,22 +20,27 @@ def mock_temp_project(tmp_path, monkeypatch):
 @pytest.fixture(scope="function")
 def repo(mock_temp_project, mock_user_home):
     repo = Repository()
-    repo.init()
     return repo
+
 
 @pytest.fixture(scope="module")
 def user_local() -> User:
     return User(name="Kovács János", email="janos@kovacs.me")
 
+
 @pytest.fixture(scope="module")
 def user_remote() -> User:
     return User(name="Remote User", email="remote@user.me")
 
+
 @pytest.fixture(scope="function")
 def case_wippolder(user_local) -> Case:
     return Case(
-        name=CaseName("wippolder"), description=None, sha1=None, data=dict(),
-        changed_by=user_local
+        name=CaseName("wippolder"),
+        description=None,
+        sha1=None,
+        data=dict(),
+        changed_by=user_local,
     )
 
 
@@ -131,8 +139,13 @@ def test_delete_case(case_wippolder, user_local, user_remote):
     assert diff_all[0].changed_by_other is None
 
 
-def test_add_data(case_wippolder, data_wippolder_gpkg, data_wippolder_gpkg_modified,
-                     user_local, user_remote):
+def test_add_data(
+    case_wippolder,
+    data_wippolder_gpkg,
+    data_wippolder_gpkg_modified,
+    user_local,
+    user_remote,
+):
     """Can we report that a new data was added by the remote?"""
     # Added by remote
     case_local = deepcopy(case_wippolder)
@@ -145,8 +158,13 @@ def test_add_data(case_wippolder, data_wippolder_gpkg, data_wippolder_gpkg_modif
     assert diff_all[0].changed_by_other == user_remote
 
 
-def test_delete_data(case_wippolder, data_wippolder_gpkg, data_wippolder_gpkg_modified,
-                     user_local, user_remote):
+def test_delete_data(
+    case_wippolder,
+    data_wippolder_gpkg,
+    data_wippolder_gpkg_modified,
+    user_local,
+    user_remote,
+):
     """Can we report that a data was deleted by the remote?"""
     # Deleted by remote
     (case_local := deepcopy(case_wippolder)).add_data(data_wippolder_gpkg)
@@ -180,8 +198,13 @@ def test_modify_case(case_wippolder, user_remote):
         assert d.status == Status.MODIFY
 
 
-def test_modify_data(case_wippolder, data_wippolder_gpkg, data_wippolder_gpkg_modified,
-                     user_local, user_remote):
+def test_modify_data(
+    case_wippolder,
+    data_wippolder_gpkg,
+    data_wippolder_gpkg_modified,
+    user_local,
+    user_remote,
+):
     """Can we report that a data was modified?"""
     # Modified by remote
     (case_local := deepcopy(case_wippolder)).add_data(data_wippolder_gpkg)
@@ -201,7 +224,12 @@ def test_modify_data(case_wippolder, data_wippolder_gpkg, data_wippolder_gpkg_mo
         assert d.changed_by_other == user_local
         assert d.status == Status.MODIFY
 
-def test_format_indexdiffs(case_wippolder, data_wippolder_gpkg, data_wippolder_gpkg_modified,):
+
+def test_format_indexdiffs(
+    case_wippolder,
+    data_wippolder_gpkg,
+    data_wippolder_gpkg_modified,
+):
     (case_local := deepcopy(case_wippolder)).add_data(data_wippolder_gpkg)
     (case_remote := deepcopy(case_wippolder)).add_data(data_wippolder_gpkg_modified)
     (index_local := Index()).add_case(case_local)
@@ -213,7 +241,9 @@ def test_format_indexdiffs(case_wippolder, data_wippolder_gpkg, data_wippolder_g
 
 
 def test_push_debug():
-    repo = Repository(path="/home/balazs/Development/geodepot/tests/data/integration/client1/.geodepot")
+    repo = Repository(
+        path="/home/balazs/Development/geodepot/tests/data/integration/client1/.geodepot"
+    )
     diff_all = repo.fetch(RemoteName("ssh"))
     repo.push(RemoteName("ssh"), diff_all)
 

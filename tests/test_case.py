@@ -1,6 +1,6 @@
 import pytest
 
-from geodepot.case import *
+from geodepot.case import CaseSpec, Case
 from geodepot.data import Data
 
 

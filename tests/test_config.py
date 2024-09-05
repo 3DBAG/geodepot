@@ -1,27 +1,36 @@
 import pytest
 
-from geodepot.config import *
 from geodepot.repository import Repository
+from geodepot.config import (
+    User,
+    Config,
+    Remote,
+    get_global_config,
+    get_local_config,
+    as_config,
+    get_global_config_path,
+    configure,
+)
 
 
 @pytest.mark.parametrize(
     "config_dict,expected",
     (
-            (dict(), dict()),
-            (
-                    {"user": {"name": "myname", "email": "<EMAIL>"}},
-                    Config(user=User(name="myname", email="<EMAIL>")),
+        (dict(), dict()),
+        (
+            {"user": {"name": "myname", "email": "<EMAIL>"}},
+            Config(user=User(name="myname", email="<EMAIL>")),
+        ),
+        (
+            {
+                "user": {"name": "myname", "email": "<EMAIL>"},
+                "remotes": {"myremote": {"url": "http://myurl"}},
+            },
+            Config(
+                user=User(name="myname", email="<EMAIL>"),
+                remotes={"myremote": Remote(name="myremote", url="http://myurl")},
             ),
-            (
-                    {
-                        "user": {"name": "myname", "email": "<EMAIL>"},
-                        "remotes": {"myremote": {"url": "http://myurl"}},
-                    },
-                    Config(
-                        user=User(name="myname", email="<EMAIL>"),
-                        remotes={"myremote": Remote(name="myremote", url="http://myurl")},
-                    ),
-            ),
+        ),
     ),
 )
 def test_as_config(config_dict: dict, expected: Config):
@@ -42,20 +51,21 @@ def test_read_local_config(mock_project_dir):
 @pytest.mark.parametrize(
     "config_global,config_local,expected",
     (
-            (
-                    Config(user=User(name="name", email="email")),
-                    Config(),
-                    Config(user=User(name="name", email="email")),
+        (
+            Config(user=User(name="name", email="email")),
+            Config(),
+            Config(user=User(name="name", email="email")),
+        ),
+        (
+            Config(user=User(name="name", email="email")),
+            Config(
+                remotes={"remote-name": Remote(name="remote-name", url="http://url")}
             ),
-            (
-                    Config(user=User(name="name", email="email")),
-                    Config(
-                        remotes={"remote-name": Remote(name="remote-name", url="http://url")}),
-                    Config(
-                        user=User(name="name", email="email"),
-                        remotes={"remote-name": Remote(name="remote-name", url="http://url")},
-                    ),
+            Config(
+                user=User(name="name", email="email"),
+                remotes={"remote-name": Remote(name="remote-name", url="http://url")},
             ),
+        ),
     ),
 )
 def test_update(config_global, config_local, expected):
@@ -109,8 +119,9 @@ def test_configure_get(mock_user_home, mock_project_dir):
 
 
 def test_remote_url():
-    remote = Remote(name="myremote",
-                    url="ssh://vagrant@192.168.56.5:/srv/geodepot/.geodepot")
+    remote = Remote(
+        name="myremote", url="ssh://vagrant@192.168.56.5:/srv/geodepot/.geodepot"
+    )
     assert remote.name == "myremote"
     assert remote.url == "vagrant@192.168.56.5"
     assert remote.path_index == "/srv/geodepot/.geodepot/index.geojson"
