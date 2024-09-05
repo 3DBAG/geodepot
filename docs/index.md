@@ -88,3 +88,9 @@ Geodepot is not a version control system, neither for data nor for code.
 It is assumed that the data that you store in a Geodepot repository is already available, and will stay available in some other form.
 Thus, if the repository is accidentally overwritten with unwanted changes, the desired state can be recreated with some effort.
 That is, because the history of the repository is not retained, only the latest version is available at any time.
+
+## Roadmap
+
+The current version (`1.0`) is considered to be feature complete, and there are no major enhancements planned.
+This does not mean however, that the current version is bug free.
+The ongoing development focuses on fixing bugs reported by users or discovered during testing.
