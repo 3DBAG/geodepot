@@ -5,6 +5,8 @@ It was born from our own requirement from writing spatial data processing tools 
 
 ## Documentation
 
+https://3DGI.github.io/geodepot
+
 ## Interfaces
 
 ### Command-line tool (CLI)

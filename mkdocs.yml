@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
 site_name: Geodepot
-site_url: https://github.com/3DGI/geodepot
+site_url: https://3DGI.github.io/geodepot
 repo_url: https://github.com/3DGI/geodepot
 repo_name: 3DGI/geodepot
 plugins:
