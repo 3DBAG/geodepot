@@ -762,6 +762,7 @@ git lfs could be sth to use, but maybe overkill because need to set up and opera
 
 ## TODOs
 
+- Add locking mechanism to push/pull
 - Only print traceback in debug mode
 - ~~Sanitize serialize/write_to_file etc.~~
 - Check again that driver detection works

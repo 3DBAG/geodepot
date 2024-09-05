@@ -1,0 +1,40 @@
+# yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
+site_name: Geodepot
+site_url: https://github.com/3DGI/geodepot
+repo_url: https://github.com/3DGI/geodepot
+repo_name: 3DGI/geodepot
+plugins:
+  - search
+theme:
+  name: material
+  palette:
+    primary: orange
+  font:
+    text: Roboto
+  language: en
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.indexes
+    - search.highlight
+    - search.suggest
+markdown_extensions:
+  # Python Markdown
+  - toc:
+      permalink: true
+  # Python Markdown Extensions
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+nav:
+  - Overview: index.md
+  - Getting started: getting-started.md
+  - Concepts: concepts.md
+  - CLI: cli.md
+  - Examples: examples.md

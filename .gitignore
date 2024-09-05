@@ -24,3 +24,7 @@
 
 # VMs
 .vagrant/
+
+# Documentation
+styles/
+.vale-styles/
