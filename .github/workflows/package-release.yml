@@ -1,0 +1,101 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Python application
+
+on:
+  push:
+    branches: ["main"]
+#    tags:
+#      - '*'
+  workflow_dispatch:
+
+jobs:
+  build:
+
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ windows-latest, ubuntu-22.04, macos-latest ]
+        include:
+          - os: windows-latest
+            artifact_name: geodepot-win
+          - os: ubuntu-22.04
+            artifact_name: geodepot-ubuntu
+          - os: macos-latest
+            artifact_name: geodepot-macos
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - name: Add conda to system path
+      run: |
+        # $CONDA is an environment variable pointing to the root of the miniconda directory
+        echo $CONDA/bin >> $GITHUB_PATH
+    - name: Install dependencies
+      run: |
+        conda env update --file conda-environment.yaml --name base
+    - if: runner.os == 'Windows'
+      run: |
+        git config --system core.longpaths true
+#    - name: Test with tox
+#      run: |
+#        tox
+    - name: Install package
+      run: pip install .
+    - if: runner.os == 'Linux'
+      name: Pyinstaller package Linux
+      run: |
+        pyinstaller \
+          --name geodepot \
+          --onedir \
+          --noconfirm \
+          --optimize 2 \
+          --add-data $CONDA/share/proj/proj.db:share/proj/proj.db \
+          --collect-all pdal --collect-all osgeo \
+          src/geodepot/__main__.py
+        zip -rj dist/geodepot-ubuntu.zip dist/geodepot
+        sha256sum dist/geodepot-ubuntu.zip > dist/geodepot-ubuntu.zip.sha256sum
+        rm dist/geodepot
+    - if: runner.os == 'macOS'
+      name: Pyinstaller package macOS
+      run: |
+        pyinstaller \
+          --name geodepot \
+          --onedir \
+          --console \
+          --noconfirm \
+          --optimize 2 \
+          --add-data $CONDA/share/proj/proj.db:share/proj/proj.db \
+          --collect-all pdal --collect-all osgeo \
+          src/geodepot/__main__.py
+        zip -rj dist/geodepot-macos.zip dist/geodepot
+        shasum -a 256 dist/geodepot-macos.zip > dist/geodepot-macos.zip.sha256sum
+        rm dist/geodepot
+    - if: runner.os == 'Windows'
+      name: Pyinstaller package Windows
+      run: |
+        pyinstaller \
+          --name geodepot \
+          --onedir \
+          --console \
+          --noconfirm \
+          --optimize 2 \
+          --add-data $CONDA/share/proj/proj.db:share/proj/proj.db \
+          --collect-all pdal --collect-all osgeo \
+          src/geodepot/__main__.py
+        certUtil -hashfile dist/geodepot.exe SHA256 > dist/geodepot.exe.sha256sum
+    - name: List contents
+      run: |
+        ls dist
+    - name: Upload binaries to
+      uses: actions/upload-artifact@v4
+      with:
+        name: geodepot
+        path: dist/*
+        retention-days: 1

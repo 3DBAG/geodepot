@@ -6,23 +6,23 @@ build-backend = "setuptools.build_meta"
 name = "geodepot"
 version = "1.0.0"
 authors = [
-    {name = "Balázs Dukai", email = "balazs.dukai@3dgi.nl"},
+    {name = "Balázs Dukai", email = "balazs.dukai@3dgi.nl"}
 ]
 description = "Test data storage system for geospatial data"
 readme = "README.md"
 requires-python = ">=3.12"
 keywords = ["geospatial", "software-testing"]
-license = {text = "Apache-2.0"}
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "gdal==3.9.1",
-    "pdal==2.7.2",
-    "pyproj==3.6.1",
-    "click==8.1.7",
+    "gdal==3.4.1",
+    "pdal==2.3.7",
+    "click==8.1.3",
     "requests==2.32.3"
 ]
 
@@ -30,7 +30,14 @@ dependencies = [
 dev = ["pytest", "pyinstaller", "briefcase", "ruff", "bumpver", "mkdocs", "mkdocs-material"]
 
 [project.scripts]
-geodepot = "geodepot:cli.geodepot_grp"
+geodepot = "geodepot:__main__.geodepot_grp"
+
+[project.urls]
+Homepage = "https://github.com/3DGI/geodepot"
+Documentation = "https://3dgi.github.io/geodepot/"
+Repository = "https://github.com/3DGI/geodepot.git"
+Issues = "https://github.com/3DGI/geodepot/issues"
+Changelog = "https://github.com/3DGI/geodepot/blob/main/CHANGELOG.md"
 
 [tool.ruff]
 src = ["src", "tests"]
@@ -49,3 +56,38 @@ push = false
 "pyproject.toml" = [
     'version = "{version}"',
 ]
+
+
+
+# content below this line added by briefcase convert
+# This project was generated with 0.3.19 using template: https://github.com/beeware/briefcase-template@v0.3.19
+[tool.briefcase]
+project_name = "Geodepot"
+bundle = "io.github.3dgi"
+version = "1.0.0"
+url = "https://3dgi.github.io/geodepot/"
+license.file = "LICENSE"
+author = "Balázs Dukai"
+author_email = "balazs.dukai@3dgi.nl"
+
+[tool.briefcase.app.geodepot]
+console_app = true
+formal_name = "Geodepot"
+description = "Test data storage system for geospatial data"
+long_description = """Geodepot helps to organize data into test cases, share them and provide integration to some of the test frameworks for ease of use.
+"""
+sources = [
+    "src/geodepot",
+]
+test_sources = [
+    "tests",
+]
+
+[tool.briefcase.app.geodepot.linux.system.ubuntu.jammy]
+requires = [
+    "gdal==3.4.1",
+    "pdal==2.3.7",
+    "click==8.1.3",
+    "requests==2.32.3"
+]
+system_requires = ["libgdal-dev", "libpdal-base13"]

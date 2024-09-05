@@ -1,11 +1,15 @@
 # IDE
-.idea
-.run
+.idea/
+.run/
 
 # Build dirs
 /src/geodepot.egg-info/
 /src/geodepot/__pycache__
+/src/geodepot.dist-info/
 /tests/__pycache__
+/build
+/dist
+/logs
 
 /experiments/pyinstaller/geodepot.spec
 /experiments/pyinstaller/build/

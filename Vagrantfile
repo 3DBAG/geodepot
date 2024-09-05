@@ -24,5 +24,6 @@ Vagrant.configure("2") do |config|
 
   config.vm.define "client0" do |client0|
     client0.vm.box = "ubuntu/jammy64"
+    client0.vm.synced_folder "dist/geodepot", "/home/vagrant/geodepot"
   end
 end

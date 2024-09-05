@@ -2,6 +2,10 @@
 
 ## Installation
 
+```shell
+pip install geodepot
+```
+
 ## First time setup
 
 ### Configure your user
