@@ -1,7 +1,7 @@
 # This workflow will install Python dependencies, run tests and lint with a single version of Python
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
 
-name: Python application
+name: Package
 
 on:
   push:
@@ -18,14 +18,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ windows-latest, ubuntu-22.04, macos-latest ]
+        os: [ ubuntu-24.04, windows-latest, macos-latest ]
         include:
           - os: windows-latest
             artifact_name: geodepot-win
-          - os: ubuntu-22.04
+            conda_exe: C:\Miniconda\Scripts\conda.exe
+          - os: ubuntu-24.04
             artifact_name: geodepot-ubuntu
+            conda_exe: conda
           - os: macos-latest
             artifact_name: geodepot-macos
+            conda_exe: conda
 
     steps:
     - uses: actions/checkout@v4
@@ -33,69 +36,73 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: "3.12"
-    - name: Add conda to system path
-      run: |
-        # $CONDA is an environment variable pointing to the root of the miniconda directory
-        echo $CONDA/bin >> $GITHUB_PATH
-    - name: Install dependencies
-      run: |
-        conda env update --file conda-environment.yaml --name base
     - if: runner.os == 'Windows'
       run: |
         git config --system core.longpaths true
-#    - name: Test with tox
-#      run: |
-#        tox
+    - if: runner.os == 'macOS'
+      name: Install Miniconda on macOS
+      run: |
+        mkdir -p $HOME/miniconda3
+        curl https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-arm64.sh -o $HOME/miniconda3/miniconda.sh
+        bash $HOME/miniconda3/miniconda.sh -b -u -p $HOME/miniconda3
+        rm $HOME/miniconda3/miniconda.sh
+        $HOME/miniconda3/bin/conda init bash
+        echo "CONDA=$HOME/miniconda3" >> $GITHUB_ENV
+    - if: runner.os != 'Windows'
+      name: Add conda to system path non-Windows
+      run: |
+        # $CONDA is an environment variable pointing to the root of the miniconda directory
+        echo $CONDA/bin >> $GITHUB_PATH
+    - if: runner.os == 'Windows'
+      name: Add conda to system path Windows
+      run: |
+        # $CONDA is an environment variable pointing to the root of the miniconda directory
+        echo $CONDA\Scripts >> $GITHUB_PATH
+    - name: List conda envs
+      run: ${{ matrix.conda_exe }} env list
+    - name: Install dependencies
+      run: |
+        ${{ matrix.conda_exe }} install -y --name base --solver=classic conda-forge::conda-libmamba-solver conda-forge::libmamba conda-forge::libmambapy conda-forge::libarchive
+        ${{ matrix.conda_exe }} install -y --name base --solver libmamba --channel conda-forge proj=9.4 click=8.1 requests=2.32 gdal=3.9 pdal=2.7 python-pdal=3.4 pyinstaller=6.10
+    - name: Re-init conda shell
+      run: |
+        ${{ matrix.conda_exe }} init --all
+    - name: Test if fucking pdal didn't fuck up gdal
+      run: |
+        python -c 'import osgeo'
     - name: Install package
-      run: pip install .
+      run: |
+        pip install .
     - if: runner.os == 'Linux'
       name: Pyinstaller package Linux
       run: |
-        pyinstaller \
-          --name geodepot \
-          --onedir \
-          --noconfirm \
-          --optimize 2 \
-          --add-data $CONDA/share/proj/proj.db:share/proj/proj.db \
-          --collect-all pdal --collect-all osgeo \
-          src/geodepot/__main__.py
-        zip -rj dist/geodepot-ubuntu.zip dist/geodepot
-        sha256sum dist/geodepot-ubuntu.zip > dist/geodepot-ubuntu.zip.sha256sum
-        rm dist/geodepot
+        pyinstaller --name geodepot --onedir --noconfirm --optimize 2 --add-data $CONDA/share/proj/proj.db:share/proj/proj.db --collect-all pdal --collect-all osgeo src/geodepot/__main__.py
+        cd dist
+        zip -r geodepot-ubuntu.zip geodepot
+        sha256sum geodepot-ubuntu.zip > geodepot-ubuntu.zip.sha256sum
+        rm -rf geodepot
     - if: runner.os == 'macOS'
       name: Pyinstaller package macOS
       run: |
-        pyinstaller \
-          --name geodepot \
-          --onedir \
-          --console \
-          --noconfirm \
-          --optimize 2 \
-          --add-data $CONDA/share/proj/proj.db:share/proj/proj.db \
-          --collect-all pdal --collect-all osgeo \
-          src/geodepot/__main__.py
-        zip -rj dist/geodepot-macos.zip dist/geodepot
-        shasum -a 256 dist/geodepot-macos.zip > dist/geodepot-macos.zip.sha256sum
-        rm dist/geodepot
+        pyinstaller --name geodepot --onedir --console --noconfirm --optimize 2 --add-data $CONDA/share/proj/proj.db:share/proj/proj.db --collect-all pdal --collect-all osgeo src/geodepot/__main__.py
+        cd dist
+        zip -r geodepot-macos.zip geodepot
+        shasum -a 256 geodepot-macos.zip > geodepot-macos.zip.sha256sum
+        rm -rf geodepot
     - if: runner.os == 'Windows'
       name: Pyinstaller package Windows
       run: |
-        pyinstaller \
-          --name geodepot \
-          --onedir \
-          --console \
-          --noconfirm \
-          --optimize 2 \
-          --add-data $CONDA/share/proj/proj.db:share/proj/proj.db \
-          --collect-all pdal --collect-all osgeo \
-          src/geodepot/__main__.py
-        certUtil -hashfile dist/geodepot.exe SHA256 > dist/geodepot.exe.sha256sum
+        pyinstaller --name geodepot --onedir --console --noconfirm --optimize 2 --add-data C:/Miniconda/Library/share/proj/proj.db:share/proj/proj.db --collect-all pdal --collect-all osgeo src/geodepot/__main__.py
+        cd dist
+        7z a geodepot-win.zip geodepot
+        certUtil -hashfile geodepot-win.zip SHA256 > geodepot-win.zip.sha256sum
+        rm -r -fo geodepot
     - name: List contents
       run: |
         ls dist
     - name: Upload binaries to
       uses: actions/upload-artifact@v4
       with:
-        name: geodepot
+        name: ${{ matrix.artifact_name }}
         path: dist/*
-        retention-days: 1
+        retention-days: 7

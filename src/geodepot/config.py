@@ -47,6 +47,7 @@ def as_user(dct: dict) -> User | dict:
 RemoteName = NewType("RemoteName", str)
 
 
+@dataclass(init=False, repr=True)
 class Remote:
     def __init__(self, name: str, url: str):
         self.name = name

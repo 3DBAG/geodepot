@@ -20,10 +20,10 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "gdal==3.4.1",
-    "pdal==2.3.7",
-    "click==8.1.3",
-    "requests==2.32.3"
+    "gdal",
+    "pdal",
+    "click",
+    "requests"
 ]
 
 [project.optional-dependencies]
