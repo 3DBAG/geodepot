@@ -6,7 +6,8 @@ build-backend = "setuptools.build_meta"
 name = "geodepot"
 version = "1.0.0"
 authors = [
-    {name = "Balázs Dukai", email = "balazs.dukai@3dgi.nl"}
+    {name = "Balázs Dukai", email = "balazs.dukai@3dgi.nl"},
+    {name = "Ravi Peters", email = "ravi.peters@3dgi.nl"}
 ]
 description = "Test data storage system for geospatial data"
 readme = "README.md"
