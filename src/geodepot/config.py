@@ -47,50 +47,55 @@ def as_user(dct: dict) -> User | dict:
 RemoteName = NewType("RemoteName", str)
 
 
-@dataclass(init=False, repr=True)
+@dataclass(repr=True)
 class Remote:
-    def __init__(self, name: str, url: str):
-        self.name = name
+    """A remote repository."""
+    name: str
+    """The name of the remote repository."""
+    url: str
+    """The URL of the remote repository. If the remote is SSH, then this is the
+    SSH connection string without the protocol and the path on the remote
+    filesystem. If the remote is HTTP, then this is the URL as provided to the
+    initializer."""
+
+    def __post_init__(self):
+        #: Set to True if the remote uses SSH/SFTP protocol
         self.is_ssh = False
+        #: The path on the remote to the repository. Only set for SSH/SFTP connections.
         self.path = None
-        self.url = url
+        #: The SSH user@host if the protocol is SSH/SFTP
+        self.ssh_host = None
+
+        ssh_parts = None
+        if self.url.startswith("ssh://"):
+            ssh_parts = self.url.removeprefix("ssh://").split(":")
+        elif self.url.startswith("sftp://"):
+            ssh_parts = self.url.removeprefix("sftp://").split(":")
+        if ssh_parts is not None:
+            if len(ssh_parts) == 2:
+                self.ssh_host = ssh_parts[0]
+                self.path = ssh_parts[1]
+            elif len(ssh_parts) == 1:
+                self.ssh_host = ssh_parts[0]
+                logger.error(
+                    f"Expected a remote URL in the form of ssh[sftp]://<url>:<path>, but did not find :<path> in {self.url}."
+                )
+            else:
+                raise GeodepotInvalidConfiguration(
+                    f"Expected a remote URL in the form of ssh[sftp]://<url>:<path>, but found {self.url}."
+                )
+            self.is_ssh = True
+            if self.ssh_host is None:
+                raise ValueError(f"Could not set Remote ssh_host from {self.url}")
 
     def __str__(self):
         return f"{self.name} {self.url}"
 
     @property
-    def url(self):
-        return self._url
-
-    @url.setter
-    def url(self, url: str):
-        if url.startswith("http://") or url.startswith("https://"):
-            self._url = url
-        else:
-            ssh_parts = None
-            if url.startswith("ssh://"):
-                ssh_parts = url.lstrip("ssh://").split(":")
-            elif url.startswith("sftp://"):
-                ssh_parts = url.lstrip("sftp://").split(":")
-            if ssh_parts is not None:
-                if len(ssh_parts) == 2:
-                    self._url = ssh_parts[0]
-                    self.path = ssh_parts[1]
-                elif len(ssh_parts) == 1:
-                    self._url = ssh_parts[0]
-                    logger.info(
-                        f"Expected a remote URL in the form of ssh[sftp]://<url>:<path>, but did not find :<path> in {url}."
-                    )
-                else:
-                    raise GeodepotInvalidConfiguration(
-                        f"Expected a remote URL in the form of ssh[sftp]://<url>:<path>, but found {url}."
-                    )
-                self.is_ssh = True
-        if self._url is None:
-            raise ValueError(f"Could not set Remote url from {url}")
-
-    @property
     def path_index(self):
+        """Path to the remote index file. If the remote is SSH, then this is the path
+        on the remote filesystem. If the remote is HTTP, then this is the URL with the
+        index file name."""
         if self.is_ssh:
             # In case of SSH, we need the path to the index on the remote filesystem
             return (
@@ -103,6 +108,9 @@ class Remote:
 
     @property
     def path_cases(self):
+        """Path to the remote cases directory. If the remote is SSH, then this is the
+        path on the remote filesystem. If the remote is HTTP, then this is the URL with
+        the cases directory name."""
         if self.is_ssh:
             # In case of SSH, we need the path to the index on the remote filesystem
             return (
@@ -114,6 +122,7 @@ class Remote:
             return "/".join([self.url, GEODEPOT_CASES])
 
     def to_json(self) -> str:
+        """Serialize the remote to a JSON string."""
         return dumps(self, cls=DataClassEncoder, indent=JSON_INDENT)
 
 

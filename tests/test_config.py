@@ -14,28 +14,74 @@ from geodepot.config import (
 
 
 @pytest.mark.parametrize(
-    "config_dict,expected",
-    (
-        (dict(), dict()),
+    argnames="config_dict,expected_user_none,expected_user_name,expected_remote_none,expected_remote_name,expected_remote_url,expected_remote_path",
+    argvalues=(
+        (dict(), True, None, True, None, (None, None), None),
         (
             {"user": {"name": "myname", "email": "<EMAIL>"}},
-            Config(user=User(name="myname", email="<EMAIL>")),
+            False,
+            "myname",
+            True,
+            None,
+            (None, None),
+            None,
         ),
         (
             {
                 "user": {"name": "myname", "email": "<EMAIL>"},
-                "remotes": {"myremote": {"url": "http://myurl"}},
+                "remotes": {"myremote": {"url": "http://myurl/.geodepot"}},
             },
-            Config(
-                user=User(name="myname", email="<EMAIL>"),
-                remotes={"myremote": Remote(name="myremote", url="http://myurl")},
-            ),
+            False,
+            "myname",
+            False,
+            "myremote",
+            ("http://myurl/.geodepot", None),
+            None,
+        ),
+        (
+            {
+                "remotes": {
+                    "remote-name": {"url": "ssh://some.server:/path/to/.geodepot"}
+                }
+            },
+            True,
+            None,
+            False,
+            "remote-name",
+            ("ssh://some.server:/path/to/.geodepot", "some.server"),
+            "/path/to/.geodepot",
         ),
     ),
+    ids=("empty", "Remote None", "Remote Http", "User None, Remote SSH"),
 )
-def test_as_config(config_dict: dict, expected: Config):
+def test_as_config(
+    config_dict: dict,
+    expected_user_none: str,
+    expected_user_name: str,
+    expected_remote_none: str,
+    expected_remote_name: str,
+    expected_remote_url: str,
+    expected_remote_path: str,
+):
     """Can we decode a configuration JSON object?"""
-    assert as_config(config_dict) == expected
+    config = as_config(config_dict)
+    if isinstance(config, dict):
+        # In case the config json is empty, it is deserialized into an empty dictionary
+        assert config == config_dict
+    else:
+        if expected_user_none:
+            assert config.user is None
+        else:
+            assert config.user.name == expected_user_name
+
+        if expected_remote_none:
+            assert config.remotes is None
+        else:
+            remote = config.remotes.get(expected_remote_name)
+            assert remote.url == expected_remote_url[0]
+            if remote.is_ssh:
+                assert remote.ssh_host == expected_remote_url[1]
+            assert remote.path == expected_remote_path
 
 
 def test_read_global_config(mock_user_home):
@@ -43,9 +89,14 @@ def test_read_global_config(mock_user_home):
     assert config.user.name == "Kovács János"
 
 
-def test_read_local_config(mock_project_dir):
+def test_read_local_config_ssh(mock_project_dir):
+    """Can we load the configuration from the repository directory?"""
     config = get_local_config()
-    assert config.remotes["remote-name"].name == "remote-name"
+    remote = config.remotes["remote-name"]
+    assert remote.name == "remote-name"
+    assert remote.ssh_host == "some.server"
+    assert remote.path == "/path/to/.geodepot"
+    assert remote.is_ssh is True
 
 
 @pytest.mark.parametrize(
@@ -118,10 +169,51 @@ def test_configure_get(mock_user_home, mock_project_dir):
     assert config.user.name == "Kovács János"
 
 
-def test_remote_url():
-    remote = Remote(
-        name="myremote", url="ssh://vagrant@192.168.56.5:/srv/geodepot/.geodepot"
-    )
+@pytest.mark.parametrize(
+    argnames="url_with_path,url,path,is_ssh",
+    argvalues=(
+        (
+            "ssh://vagrant@192.168.56.5:/srv/geodepot/.geodepot",
+            "vagrant@192.168.56.5",
+            "/srv/geodepot/.geodepot",
+            True,
+        ),
+        (
+            "ssh://192.168.56.5:/srv/geodepot/.geodepot",
+            "192.168.56.5",
+            "/srv/geodepot/.geodepot",
+            True,
+        ),
+        ("ssh://vagrant@192.168.56.5", "vagrant@192.168.56.5", "", True),
+        (
+            "https://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot",
+            "https://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot",
+            "",
+            False,
+        ),
+        (
+            "http://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot",
+            "http://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot",
+            "",
+            False,
+        ),
+    ),
+    ids=("ssh-with-user", "ssh-without-user", "ssh-with-user-no-path", "https", "http"),
+)
+def test_remote_create(url_with_path, url, path, is_ssh):
+    """Can we instantiate a Remote object with the supported protocols and URL/path
+    configurations?"""
+    remote = Remote(name="myremote", url=url_with_path)
     assert remote.name == "myremote"
-    assert remote.url == "vagrant@192.168.56.5"
-    assert remote.path_index == "/srv/geodepot/.geodepot/index.geojson"
+    if is_ssh:
+        assert remote.is_ssh is True
+        assert remote.ssh_host == url
+        assert (
+            remote.path_index == f"{path}/index.geojson"
+            if path != ""
+            else "index.geojson"
+        )
+    else:
+        assert remote.is_ssh is False
+        assert remote.url == url
+        assert remote.path_index == f"{url}/index.geojson"

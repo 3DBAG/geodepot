@@ -617,7 +617,7 @@ class Repository:
                 # GDAL cannot handle ssh/sftp
                 from fabric import Connection
 
-                ssh_conn = Connection(remote.url)
+                ssh_conn = Connection(remote.ssh_host)
                 remote_index_locally = self.path / f"remote_{GEODEPOT_INDEX}"
                 try:
                     result = ssh_conn.get(
@@ -662,7 +662,7 @@ class Repository:
             i.casespec_self for i in diff_all if i.status == Status.DELETE
         )
 
-        conn_ssh = Connection(remote.url)
+        conn_ssh = Connection(remote.ssh_host)
 
         for data in data_to_download:
             data_path_local = self.path_cases.joinpath(data.to_path())
@@ -743,7 +743,7 @@ class Repository:
             i.casespec_other for i in diff_all if i.status == Status.ADD
         )
 
-        conn_ssh = Connection(remote.url)
+        conn_ssh = Connection(remote.ssh_host)
 
         for data in data_to_upload:
             data_path_local = self.path_cases.joinpath(data.to_path())
@@ -892,7 +892,10 @@ class Repository:
                     dirs_exist_ok=True,
                 )
 
-    def _load_from_path(self, path: Path):
+    def _load_from_path(self, path: Path) -> None:
+        """Load a repository from a local path.
+
+        :raises: GeodepotInvalidRepository"""
         self.path = path
         self.load_index()
         self.load_config()
@@ -906,7 +909,7 @@ class Repository:
             )
         logger.debug(f"Loaded existing geodepot repository at {self.path}")
 
-    def _new_at_path(self, path: Path):
+    def _new_at_path(self, path: Path) -> None:
         self.path = path
         self.path.mkdir()
         self.path_cases.mkdir()
