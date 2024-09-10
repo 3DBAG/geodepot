@@ -28,6 +28,9 @@ class Drivers(Enum):
     OGR = auto()
     PDAL = auto()
 
+    def __str__(self):
+        return self.name
+
 
 @dataclass(repr=True)
 class BBox:
@@ -304,6 +307,7 @@ class Data:
         df.sha1 = feature["data_sha1"]
         df.description = feature["data_description"]
         df.format = feature["data_format"]
+        df.driver = feature["data_driver"]
         df.changed_by = User.from_pretty(feature["data_changed_by"])
         df.license = feature["data_license"]
         if (gref := feature.GetGeometryRef()) is not None:

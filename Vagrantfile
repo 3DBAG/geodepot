@@ -24,8 +24,15 @@ Vagrant.configure("2") do |config|
 
   config.vm.define "client0" do |client0|
     client0.vm.box = "ubuntu/jammy64"
-    client0.vm.synced_folder "dist/geodepot", "/home/vagrant/geodepot"
+    client0.vm.synced_folder "tests/data/sources", "/home/vagrant/data"
     client0.vm.synced_folder "tests/data/integration/client0", "/home/vagrant/geodepot-repository",
+        owner: "vagrant", group: "vagrant"
+  end
+
+  config.vm.define "client1" do |client1|
+    client1.vm.box = "ubuntu/jammy64"
+    client1.vm.synced_folder "tests/data/sources", "/home/vagrant/data"
+    client1.vm.synced_folder "tests/data/integration/client1", "/home/vagrant/geodepot-repository",
         owner: "vagrant", group: "vagrant"
   end
 end

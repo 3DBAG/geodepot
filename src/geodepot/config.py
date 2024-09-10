@@ -50,6 +50,7 @@ RemoteName = NewType("RemoteName", str)
 @dataclass(repr=True)
 class Remote:
     """A remote repository."""
+
     name: str
     """The name of the remote repository."""
     url: str

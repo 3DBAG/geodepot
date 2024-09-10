@@ -10,7 +10,7 @@ def data_dir():
 
 @pytest.fixture(scope="session")
 def wippolder_dir(data_dir):
-    return data_dir / "wippolder"
+    return data_dir / "sources" / "wippolder"
 
 
 @pytest.fixture(scope="function")

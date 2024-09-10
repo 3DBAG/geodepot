@@ -151,6 +151,7 @@ class Index:
                 FieldDefn("data_sha1", OFTString),
                 FieldDefn("data_description", OFTString),
                 FieldDefn("data_format", OFTString),
+                FieldDefn("data_driver", OFTString),
                 FieldDefn("data_changed_by", OFTString),
                 FieldDefn("data_license", OFTString),
                 FieldDefn("data_srs", OFTString),
@@ -184,6 +185,7 @@ class Index:
                         feat["data_sha1"] = data.sha1
                         feat["data_description"] = data.description
                         feat["data_format"] = data.format
+                        feat["data_driver"] = data.driver
                         feat["data_changed_by"] = (
                             data.changed_by.to_pretty()
                             if data.changed_by is not None

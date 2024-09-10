@@ -5,7 +5,7 @@ from geodepot.data import Data, is_cityjson, try_ogr, try_pdal
 
 @pytest.mark.parametrize(
     "file_name",
-    ("wippolder.gpkg", "wippolder.las", "3dbag_one.city.json", "wippolder.tif"),
+    ("wippolder.gpkg", "wippolder.las", "3dbag-10-286-560.city.json", "wippolder.tif"),
 )
 def test_data_file(mock_proj_lib, wippolder_dir, file_name):
     """Can we initialize a DataFile from a local file?"""
