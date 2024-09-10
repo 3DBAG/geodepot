@@ -21,14 +21,14 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "gdal==3.9",
-    "pdal==3.4",
-    "click==8.1",
-    "requests==2.32"
+    "gdal==3.9.*",
+    "pdal==3.4.*",
+    "click==8.1.*",
+    "requests==2.32.*"
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pyinstaller==6.10", "ruff", "bumpver", "mkdocs", "mkdocs-material"]
+dev = ["pytest", "pyinstaller==6.10.*", "ruff", "bumpver", "mkdocs", "mkdocs-material"]
 
 [project.scripts]
 geodepot = "geodepot:__main__.geodepot_grp"
