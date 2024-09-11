@@ -1,5 +1,39 @@
 # Command-line tool
 
+## geodepot
+
+Test data storage system for geospatial data
+
+**Usage**
+
+```shell
+geodepot [OPTIONS] <COMMAND>
+```
+
+**Commands**
+
+[`geodepot add`](#add): Add or update a case or a data item.
+
+[`geodepot config`](#config): Query or set Geodepot configuration values.
+
+[`geodepot fetch`](#fetch): Compare the local repository against a remote.
+
+[`geodepot get`](#get): Return the full local path to the specified data item of the specified case.
+
+[`geodepot init`](#init): Initialise a Geodepot repository in the current directory.
+
+[`geodepot list`](#list): List the cases and data items in the repository.
+
+[`geodepot pull`](#pull): Download any changes from a remote repository and overwrite the local version.
+
+[`geodepot push`](#push): Upload any local changes to a remote repository and overwrite the remote version.
+
+[`geodepot remote`](#remote): Connect an existing remote Geodepot repository.
+
+[`geodepot remove`](#remove): Delete a case or a data entry from the repository.
+
+[`geodepot show`](#show): Show the details of the specified case or data.
+
 ## add
 
 **Synopsis**
@@ -93,19 +127,8 @@ geodepot config set [--global] <name> <value>
 
 **Description**
 
-You can query or set options with this command.
+Query or set Geodepot configuration values.
 The `name` is actually the section and the key separated by a dot, and the `value` will be escaped.
-
-**Commands**
-
-`list`:
-List all variables set in the config files, along with their values.
-
-`get`:
-Emits the value of the specified key. If key is present multiple times in the configuration, emits the last value.
-
-`set`:
-Set the value for one configuration option.
 
 **Options**
 
@@ -120,6 +143,18 @@ For reading options: read only from the global `~/.geodepotconfig` file rather t
 geodepot config add --global user.name "Kovács János"
 geodepot config add --global user.email janos@kovacs.me
 ```
+
+### config list
+
+List all variables set in the config files, along with their values.
+
+### config get
+
+Emits the value of the specified key. If key is present multiple times in the configuration, emits the last value.
+
+### config set
+
+Set the value for one configuration option.
 
 ## get
 
@@ -189,7 +224,7 @@ geodepot pull [--yes] <name>
 
 **Description**
 
-Download any local changes from the remote repository `<name>`, overwriting the local version.
+Download any changes from the remote repository `<name>`, overwriting the local version.
 Geodepot lists the differences between the local and remote, by calling `geodepot fetch` internally and asks for confirmation before overwriting the local.
 
 **Options**
@@ -229,22 +264,23 @@ geodepot remote remove <name>
 
 Connect an existing remote Geodepot repository.
 
-**Commands**
-
-`list`:
-List the available remote repositories.
-
-`add`:
-Add a remote repository to track. The remote repository must exist.
-
-`remove`:
-Remove the remote from the tracked remotes. The remote repository is not deleted.
-
 **Examples**
 
 ```shell
 geodepot remote add origin https://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot
 ```
+
+### remote list
+
+List the available remote repositories.
+
+### remote add
+
+Add a remote repository to track. The remote repository must exist.
+
+### remote remove
+
+Remove the remote from the tracked remotes. The remote repository is not deleted.
 
 ## remove
 

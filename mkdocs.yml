@@ -36,5 +36,5 @@ nav:
   - Overview: index.md
   - Getting started: getting-started.md
   - Concepts: concepts.md
-  - CLI: cli.md
+  - Commands: cli.md
   - Examples: examples.md
