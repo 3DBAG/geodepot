@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 from osgeo.ogr import UseExceptions
 
 from geodepot import (
+    ARCHIVE_EXTENSION,
     GEODEPOT_CONFIG_LOCAL,
     GEODEPOT_INDEX,
     GEODEPOT_INDEX_EPSG,
@@ -513,7 +514,8 @@ class Repository:
                     data_description=data_description,
                     data_changed_by=current_user,
                 )
-                self._copy_data(p, casespec)
+                destination = self._copy_data(p, casespec)
+                _ = self._compress_data(destination)
                 logger.info(f"Added {data.name} to {case.name}")
                 logger.debug(data.to_pretty())
         self.index.add_case(case)
@@ -545,7 +547,7 @@ class Repository:
         logger.info(f"The entry {casespec} does not exist in the repository.")
         return None
 
-    def get_data_path(self, casespec: CaseSpec) -> Path | None:
+    def get_data_path(self, casespec: CaseSpec, remote_name: str = "origin") -> Path | None:
         """Retrieve the full path to an existing data item.
 
         If the data file does not exist locally, and a remote is configured, that
@@ -556,31 +558,40 @@ class Repository:
             if data_path.exists():
                 return data_path
             else:
-                # Try downloading from remote
-                from requests import get as requests_get
+                archive = data_path.with_suffix(ARCHIVE_EXTENSION)
+                if not archive.exists():
+                    # Try downloading from remote
+                    from requests import get as requests_get
 
-                remote = self.config.remotes.get("origin")
-                if remote is not None:
-                    logger.debug(
-                        f"Did not find {casespec} locally, trying remote {remote}"
-                    )
-                    url_remote_data = "/".join(
-                        [remote.url, GEODEPOT_CASES, str(casespec)]
-                    )
-                    response = requests_get(url_remote_data)
-                    if response.status_code == 200:
-                        data_path.parent.mkdir(exist_ok=True)
-                        data_path.write_bytes(response.content)
-                        logger.info(f"Downloaded {casespec} from remote '{remote}'")
-                        return data_path
-                    elif response.status_code == 404:
-                        pass
+                    remote = self.config.remotes.get(remote_name)
+                    if remote is not None:
+                        logger.debug(
+                            f"Did not find {casespec} locally, trying remote {remote}"
+                        )
+                        casespec_archive = casespec.to_path().with_suffix(ARCHIVE_EXTENSION)
+                        url_remote_archive = "/".join(
+                            [remote.url, GEODEPOT_CASES, str(casespec_archive)]
+                        )
+                        response = requests_get(url_remote_archive)
+                        if response.status_code == 200:
+                            archive.parent.mkdir(exist_ok=True)
+                            archive.write_bytes(response.content)
+                            logger.info(f"Downloaded {casespec} from remote '{remote}'")
+                        elif response.status_code == 404:
+                            pass
+                        else:
+                            response.raise_for_status()
                     else:
-                        response.raise_for_status()
-                else:
-                    logger.debug(
-                        f"Trying to download {casespec} from a remote, but the config does not contain a remote with name 'origin'."
-                    )
+                        logger.debug(
+                            f"Trying to download {casespec} from a remote, but the config does not contain a remote with name {remote_name}."
+                        )
+                if archive.exists():
+                    success = self._decompress_data(archive)
+                    if success and data_path.exists():
+                        return data_path
+                    else:
+                        logger.error(
+                            f"Failed to decompress data file {data_path} from {archive}")
         logger.info(f"The entry {casespec} does not exist in the repository.")
         return None
 
@@ -668,35 +679,17 @@ class Repository:
 
         for data in data_to_download:
             data_path_local = self.path_cases.joinpath(data.to_path())
-            data_path_remote = "/".join([remote.path_cases, str(data)])
-            if data.is_case:
-                case_archive = f"{data.case_name}.tar"
-                try:
-                    result = conn_ssh.run(
-                        f"tar -cf {case_archive} -C {remote.path_cases} {data}"
-                    )
-                    if not result.ok:
-                        logger.error(
-                            f"Failed to tar {data} on remote {remote.name} with:\n{result.stderr}"
-                        )
-                    local_case_archive = self.path_cases / case_archive
-                    _ = conn_ssh.get(local=str(local_case_archive), remote=case_archive)
-                    with TarFile(local_case_archive) as tf:
-                        tf.extractall(path=self.path_cases)
-                    local_case_archive.unlink()
-                except Exception as e:
-                    logger.error(
-                        f"Failed to download {data} from remote {remote.name} with:\n{e}"
-                    )
-            else:
-                logger.debug(f"GET local={data_path_local} remote={data_path_remote}")
-                try:
-                    _ = conn_ssh.get(local=data_path_local, remote=data_path_remote)
-                    logger.info(f"Downloaded {data} from {remote.name}")
-                except Exception as e:
-                    logger.error(
-                        f"Failed to download {data} from {remote.name} with:\n{e}"
-                    )
+            # data_path_remote = "/".join([remote.path_cases, str(data)])
+            casespec_archive = data.to_path().with_suffix(ARCHIVE_EXTENSION)
+            archive_path_remote = "/".join([remote.path_cases, str(casespec_archive)])
+            local_case_archive = self.path_cases / casespec_archive
+            try:
+                _ = conn_ssh.get(local=str(local_case_archive),
+                                 remote=archive_path_remote)
+            except Exception as e:
+                logger.error(
+                    f"Failed to download {data} from remote {remote.name} with:\n{e}"
+                )
         for data in data_to_delete:
             if data.is_case:
                 try:
@@ -748,71 +741,62 @@ class Repository:
         conn_ssh = Connection(remote.ssh_host)
 
         for data in data_to_upload:
-            data_path_local = self.path_cases.joinpath(data.to_path())
-            data_path_remote = "/".join([remote.path_cases, str(data)])
             if data.is_case:
                 # Upload a whole case
-                for dirpath, dirnames, filenames in data_path_local.walk():
-                    relpath = dirpath.relative_to(self.path_cases)
-                    remote_path = "/".join([remote.path_cases, str(relpath)])
-                    try:
-                        result = conn_ssh.run(f"mkdir -p {remote_path}")
-                        if not result.ok:
-                            logger.error(
-                                f"Failed to create directory {relpath} on {remote.name} with:\n{result.stderr}"
-                            )
-                    except Exception as e:
+                case_path_remote = "/".join([remote.path_cases, str(data)])
+                # Create the case dir
+                try:
+                    result = conn_ssh.run(f"mkdir -p {case_path_remote}")
+                    if not result.ok:
                         logger.error(
-                            f"Failed to create directory {relpath} on {remote.name} with:\n{e}:"
+                            f"Failed to create directory {case_path_remote} on {remote.name} with:\n{result.stderr}"
                         )
-
-                    for d in dirnames:
-                        local_path = dirpath / d
-                        relpath = local_path.relative_to(self.path_cases)
-                        remote_path = "/".join([remote.path_cases, str(relpath)])
-                        try:
-                            result = conn_ssh.run(f"mkdir -p {remote_path}")
-                            if not result.ok:
-                                logger.error(
-                                    f"Failed to create directory {d} on {remote.name} with:\n{result.stderr}"
-                                )
-                        except Exception as e:
-                            logger.error(
-                                f"Failed to create directory {d} on {remote.name} with:\n{e}:"
-                            )
-
+                except Exception as e:
+                    logger.error(
+                        f"Failed to create directory {case_path_remote} on {remote.name} with:\n{e}:"
+                    )
+                # Upload each archive in the case
+                for dirpath, dirnames, filenames in self.path_cases.joinpath(data.to_path()).walk():
                     for filename in filenames:
-                        local_path = dirpath / filename
-                        relpath = local_path.relative_to(self.path_cases)
-                        remote_path = "/".join([remote.path_cases, str(relpath)])
-                        try:
-                            logger.debug(f"PUT local={local_path} remote={remote_path}")
-                            _ = conn_ssh.put(local=local_path, remote=remote_path)
-                            logger.info(f"Uploaded {data} to {remote.name}")
-                        except Exception as e:
-                            logger.error(
-                                f"Failed to upload {data} to {remote.name} with:\n{e}"
-                            )
+                        path_local = Path(dirpath, filename)
+                        if path_local.suffix == ARCHIVE_EXTENSION:
+                            archive_path_local = path_local
+                            # here data is just the case name
+                            archive_path_remote = "/".join(
+                                [remote.path_cases, str(data), filename])
+                            try:
+                                logger.debug(f"PUT local={archive_path_local} remote={archive_path_remote}")
+                                _ = conn_ssh.put(local=archive_path_local, remote=archive_path_remote)
+                                logger.info(f"Uploaded {data} to {remote.name}")
+                            except Exception as e:
+                                logger.error(
+                                    f"Failed to upload {data} to {remote.name} with:\n{e}"
+                                )
             else:
                 # Upload a single data file
+                casespec_archive = data.to_path().with_suffix(ARCHIVE_EXTENSION)
+                archive_path_local = self.path_cases.joinpath(casespec_archive)
+                archive_path_remote = "/".join(
+                    [remote.path_cases, str(casespec_archive)])
                 try:
                     logger.debug(
-                        f"PUT local={data_path_local} remote={data_path_remote}"
+                        f"PUT local={archive_path_local} remote={archive_path_remote}"
                     )
-                    _ = conn_ssh.put(local=data_path_local, remote=data_path_remote)
+                    _ = conn_ssh.put(local=archive_path_local, remote=archive_path_remote)
                     logger.info(f"Uploaded {data} to {remote.name}")
                 except Exception as e:
                     logger.error(f"Failed to upload {data} to {remote.name} with:\n{e}")
         for data in data_to_delete:
-            data_path_remote = "/".join([remote.path_cases, str(data)])
+            casespec_archive = data.to_path().with_suffix(ARCHIVE_EXTENSION)
+            archive_path_remote = "/".join([remote.path_cases, str(casespec_archive)])
             try:
                 if data.is_case:
                     # Delete a whole case
-                    result = conn_ssh.run(f"rm -rf {data_path_remote}")
+                    case_path_remote = "/".join([remote.path_cases, str(data)])
+                    result = conn_ssh.run(f"rm -rf {case_path_remote}")
                 else:
                     # Delete a data file
-                    result = conn_ssh.run(f"rm {data_path_remote}")
-
+                    result = conn_ssh.run(f"rm {archive_path_remote}")
                 if not result.ok:
                     logger.error(
                         f"Failed to delete {data} on {remote.name} with:\n{result.stderr}"
@@ -850,7 +834,8 @@ class Repository:
                     if (p := self.path_cases.joinpath(casespec.to_path())).is_dir():
                         p.rmdir()
                     else:
-                        p.unlink(missing_ok=False)
+                        p.unlink(missing_ok=True)
+                        p.with_suffix(ARCHIVE_EXTENSION).unlink(missing_ok=False)
                         # TODO: I could remove the whole case if there are no more files. Don't forget to remove the case from the index too.
                     self.index.write(self.path_index)
                     logger.info(f"Removed {data.name} from the repository")
@@ -867,32 +852,64 @@ class Repository:
         """Serialize the index."""
         self.index.write(self.path_index)
 
-    def _copy_data(self, path: Path, casespec: CaseSpec):
-        """Copies a data entry into the repository."""
+    def _compress_data(self, path: Path) -> Path:
+        """Compresses a data item in the repository."""
+        if not path.exists():
+            raise FileNotFoundError(f"Cannot compress {path}, because it does not exist")
+        archive = path.with_suffix(ARCHIVE_EXTENSION)
+        recursive = True if path.is_dir() else False
+        # WARNING this creates a tar archive, then throws FileNotFoundError even if
+        # path does not exist.
+        with TarFile(name=archive, mode="w") as tf:
+            tf.add(path, arcname=path.name, recursive=recursive)
+        return archive
+
+    def _copy_data(self, path: Path, casespec: CaseSpec) -> Path | None:
+        """Copies a data entry into the repository.
+
+        :returns: The Path to the destination.
+        """
+        destination = None
         if path.is_file():
             if casespec.data_name is not None:
                 # Rename the file when copied into the case
+                destination = self.path_cases.joinpath(casespec.case_name, casespec.data_name)
                 copy2(
                     path,
-                    self.path_cases.joinpath(casespec.case_name, casespec.data_name),
+                    destination,
                 )
             else:
                 # Keep the file name
-                copy2(path, self.path_cases.joinpath(casespec.case_name, path.name))
+                destination = self.path_cases.joinpath(casespec.case_name, path.name)
+                copy2(path, destination)
         else:
             if casespec.data_name is not None:
                 # Copying a directory as a single data entry under a new name
+                destination = self.path_cases.joinpath(casespec.case_name, casespec.data_name)
                 copytree(
                     path,
-                    self.path_cases.joinpath(casespec.case_name, casespec.data_name),
+                    destination,
                     dirs_exist_ok=True,
                 )
             else:
+                destination = self.path_cases.joinpath(casespec.case_name, path.name)
                 copytree(
                     path,
-                    self.path_cases.joinpath(casespec.case_name, path.name),
+                    destination,
                     dirs_exist_ok=True,
                 )
+        return destination
+
+    def _decompress_data(self, path: Path) -> bool:
+        """Decompresses a data entry into the repository."""
+        try:
+            with TarFile(path, mode="r") as tf:
+                tf.extractall(path=self.path_cases)
+            return True
+        except Exception as e:
+            logger.critical(f"Failed to decompress {path} with:\n{e}")
+        return False
+
 
     def _load_from_path(self, path: Path) -> None:
         """Load a repository from a local path.

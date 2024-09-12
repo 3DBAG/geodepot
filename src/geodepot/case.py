@@ -87,6 +87,7 @@ class Case:
         return self.data.get(name)
 
     def remove_data(self, name: DataName) -> Data | None:
+        """Deletes the data item from the register of the Case."""
         self.changed_by = get_current_user()
         return self.data.pop(name, None)
 
