@@ -96,7 +96,7 @@ def test_add_files(repo, wippolder_dir):
         repo.get_data(CaseSpec(CaseName("wippolder"), DataName("wippolder.gpkg")))
         is not None
     )
-    assert (repo.path_cases / "wippolder" / "wippolder.gpkg").exists()
+    assert (repo.path_cases / "wippolder" / "wippolder.gpkg.tar").exists()
 
     repo.add(
         "wippolder",
@@ -108,7 +108,7 @@ def test_add_files(repo, wippolder_dir):
         repo.get_data(CaseSpec(CaseName("wippolder"), DataName("wippolder.las")))
         is not None
     )
-    assert (repo.path_cases / "wippolder" / "wippolder.las").exists()
+    assert (repo.path_cases / "wippolder" / "wippolder.las.tar").exists()
 
 
 def test_add_directory(repo, wippolder_dir):

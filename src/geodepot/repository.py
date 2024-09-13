@@ -522,7 +522,10 @@ class Repository:
                 destination = self._copy_data(p, casespec)
                 path_archive = self._compress_data(destination)
                 if path_archive.exists():
-                    destination.unlink()
+                    if destination.is_file():
+                        destination.unlink()
+                    else:
+                        rmtree(destination)
                 else:
                     logger.critical(f"Failed to compress {destination} and {path_archive} does not exist")
                 logger.info(f"Added {data.name} to {case.name}")
