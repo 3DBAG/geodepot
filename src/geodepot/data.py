@@ -308,7 +308,10 @@ class Data:
         df.description = feature["data_description"]
         df.format = feature["data_format"]
         df.driver = feature["data_driver"]
-        df.changed_by = User.from_pretty(feature["data_changed_by"])
+        if feature["data_changed_by"] is None:
+            df.changed_by = None
+        else:
+            df.changed_by = User.from_pretty(feature["data_changed_by"])
         df.license = feature["data_license"]
         if (gref := feature.GetGeometryRef()) is not None:
             extent = gref.GetEnvelope()

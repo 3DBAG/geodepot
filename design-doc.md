@@ -762,6 +762,7 @@ git lfs could be sth to use, but maybe overkill because need to set up and opera
 
 ## TODOs
 
+- Don't specify `.geodepot` dir when providing a path/url to a repository, but the initializer should automatically use the `.geodepot` subdirectory of the provided path
 - Add locking mechanism to push/pull
 - Only print traceback in debug mode
 - ~~Sanitize serialize/write_to_file etc.~~
