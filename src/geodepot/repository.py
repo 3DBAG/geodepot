@@ -520,7 +520,11 @@ class Repository:
                     data_changed_by=current_user,
                 )
                 destination = self._copy_data(p, casespec)
-                _ = self._compress_data(destination)
+                path_archive = self._compress_data(destination)
+                if path_archive.exists():
+                    destination.unlink()
+                else:
+                    logger.critical(f"Failed to compress {destination} and {path_archive} does not exist")
                 logger.info(f"Added {data.name} to {case.name}")
                 logger.debug(data.to_pretty())
         self.index.add_case(case)
