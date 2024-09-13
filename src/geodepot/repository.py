@@ -563,7 +563,7 @@ class Repository:
             if data_path.exists():
                 return data_path
             else:
-                archive = data_path.with_suffix(ARCHIVE_EXTENSION)
+                archive = data_path.parent / (data_path.name + ARCHIVE_EXTENSION)
                 if not archive.exists():
                     # Try downloading from remote
                     from requests import get as requests_get
@@ -573,9 +573,9 @@ class Repository:
                         logger.debug(
                             f"Did not find {casespec} locally, trying remote {remote}"
                         )
-                        casespec_archive = casespec.to_path().with_suffix(ARCHIVE_EXTENSION)
+                        casespec_archive = str(casespec) + ARCHIVE_EXTENSION
                         url_remote_archive = "/".join(
-                            [remote.url, GEODEPOT_CASES, str(casespec_archive)]
+                            [remote.url, GEODEPOT_CASES, casespec_archive]
                         )
                         response = requests_get(url_remote_archive)
                         if response.status_code == 200:
@@ -685,8 +685,8 @@ class Repository:
         for data in data_to_download:
             data_path_local = self.path_cases.joinpath(data.to_path())
             # data_path_remote = "/".join([remote.path_cases, str(data)])
-            casespec_archive = data.to_path().with_suffix(ARCHIVE_EXTENSION)
-            archive_path_remote = "/".join([remote.path_cases, str(casespec_archive)])
+            casespec_archive = str(data) + ARCHIVE_EXTENSION
+            archive_path_remote = "/".join([remote.path_cases, casespec_archive])
             local_case_archive = self.path_cases / casespec_archive
             try:
                 _ = conn_ssh.get(local=str(local_case_archive),
@@ -764,7 +764,7 @@ class Repository:
                 for dirpath, dirnames, filenames in self.path_cases.joinpath(data.to_path()).walk():
                     for filename in filenames:
                         path_local = Path(dirpath, filename)
-                        if path_local.suffix == ARCHIVE_EXTENSION:
+                        if path_local.suffixes[-1] == ARCHIVE_EXTENSION:
                             archive_path_local = path_local
                             # here data is just the case name
                             archive_path_remote = "/".join(
@@ -779,10 +779,10 @@ class Repository:
                                 )
             else:
                 # Upload a single data file
-                casespec_archive = data.to_path().with_suffix(ARCHIVE_EXTENSION)
+                casespec_archive = str(data) + ARCHIVE_EXTENSION
                 archive_path_local = self.path_cases.joinpath(casespec_archive)
                 archive_path_remote = "/".join(
-                    [remote.path_cases, str(casespec_archive)])
+                    [remote.path_cases, casespec_archive])
                 try:
                     logger.debug(
                         f"PUT local={archive_path_local} remote={archive_path_remote}"
@@ -792,8 +792,8 @@ class Repository:
                 except Exception as e:
                     logger.error(f"Failed to upload {data} to {remote.name} with:\n{e}")
         for data in data_to_delete:
-            casespec_archive = data.to_path().with_suffix(ARCHIVE_EXTENSION)
-            archive_path_remote = "/".join([remote.path_cases, str(casespec_archive)])
+            casespec_archive = str(data) + ARCHIVE_EXTENSION
+            archive_path_remote = "/".join([remote.path_cases, casespec_archive])
             try:
                 if data.is_case:
                     # Delete a whole case
@@ -840,7 +840,7 @@ class Repository:
                         p.rmdir()
                     else:
                         p.unlink(missing_ok=True)
-                        p.with_suffix(ARCHIVE_EXTENSION).unlink(missing_ok=False)
+                        (p.parent / (p.name + ARCHIVE_EXTENSION)).unlink(missing_ok=False)
                         # TODO: I could remove the whole case if there are no more files. Don't forget to remove the case from the index too.
                     self.index.write(self.path_index)
                     logger.info(f"Removed {data.name} from the repository")
@@ -861,7 +861,7 @@ class Repository:
         """Compresses a data item in the repository."""
         if not path.exists():
             raise FileNotFoundError(f"Cannot compress {path}, because it does not exist")
-        archive = path.with_suffix(ARCHIVE_EXTENSION)
+        archive = path.parent / (path.name + ARCHIVE_EXTENSION)
         recursive = True if path.is_dir() else False
         # WARNING this creates a tar archive, then throws FileNotFoundError even if
         # path does not exist.
