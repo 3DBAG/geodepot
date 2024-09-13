@@ -595,7 +595,7 @@ class Repository:
                             f"Trying to download {casespec} from a remote, but the config does not contain a remote with name {remote_name}."
                         )
                 if archive.exists():
-                    success = self._decompress_data(archive)
+                    success = self._decompress_data(archive, casespec)
                     if success and data_path.exists():
                         return data_path
                     else:
@@ -909,11 +909,11 @@ class Repository:
                 )
         return destination
 
-    def _decompress_data(self, path: Path) -> bool:
+    def _decompress_data(self, path: Path, casespec: CaseSpec) -> bool:
         """Decompresses a data entry into the repository."""
         try:
             with TarFile(path, mode="r") as tf:
-                tf.extractall(path=self.path_cases)
+                tf.extractall(path=self.path_cases / casespec.case_name)
             return True
         except Exception as e:
             logger.critical(f"Failed to decompress {path} with:\n{e}")

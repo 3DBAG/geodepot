@@ -170,6 +170,12 @@ def test_add_license_data(repo, wippolder_dir):
     assert df_updated.license == "CC-0"
 
 
+def test_get_local(mock_project_dir):
+    """Can we retrieve the local path of a data item?"""
+    repo = Repository()
+    p = repo.get_data_path(CaseSpec("wippolder", "wippolder.gpkg"))
+    assert p.exists()
+
 def test_get_remote(mock_temp_project):
     """Can we get a data item from the remote repository?"""
     repo = Repository(
