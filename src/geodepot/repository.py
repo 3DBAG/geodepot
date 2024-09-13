@@ -465,10 +465,15 @@ class Repository:
         # Determine if we need to update a case's description or a data's description
         case_description = None
         data_description = None
-        if casespec.data_name is not None:
-            data_description = description
+        if pathspec is None:
+            if casespec.data_name is not None:
+                data_description = description
+            else:
+                case_description = description
         else:
-            case_description = description
+            # If a data path is provided, we always update the data item description,
+            # even if the casespec only refers to a case, not the data item itself.
+            data_description = description
         # Get an existing case or create an new if not exists
         if (case := self.get_case(casespec)) is None:
             try:
