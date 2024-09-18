@@ -55,6 +55,25 @@ When writing a test, use one of the API functions to get the full path to the da
         p = repo.get("wippolder/wippolder.gpkg")
     ```
 
+=== "CMake"
+
+    ```cmake
+    include(GeoDepot)
+    
+    GeodepotInit("https://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot")
+    GeodepotGet("wippolder/wippolder.gpkg")
+
+    # add executables, entable tests etc...
+
+    # The GEODEPOT_DIR variable stores the path to the data in the repository that was 
+    # initialized and downloaded by GeodepotInit and GeodepotGet
+    add_test(
+          NAME "function-using-geodepot-data"
+          COMMAND test_geodepot_cmake "${GEODEPOT_DIR}/wippolder/wippolder.gpkg"
+          WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+    ```
+
+
 Alternatively, you can also use the CLI to get the data path.
 
 ```shell
@@ -79,6 +98,7 @@ The API is available in:
 
 - C++ (implementation)
 - Python (binding)
+- CMake (binding)
 
 Repository: [https://github.com/3DGI/geodepot-api](https://github.com/3DGI/geodepot-api)
 
