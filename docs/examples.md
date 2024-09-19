@@ -1,5 +1,7 @@
 # Examples
 
+!!! warning "Incomplete section"
+
 Initialising an empty repository, adding a case, adding a remote and uploading the repository to the remote.
 
 ```shell

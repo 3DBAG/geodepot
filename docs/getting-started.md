@@ -2,6 +2,8 @@
 
 ## Installation
 
+!!! warning "Incomplete section"
+
 ```shell
 pip install geodepot
 ```

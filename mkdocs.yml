@@ -32,9 +32,12 @@ markdown_extensions:
   - pymdownx.superfences
   - pymdownx.tabbed:
       alternate_style: true
+  - admonition
+  - pymdownx.details
 nav:
   - Overview: index.md
   - Getting started: getting-started.md
   - Concepts: concepts.md
   - Commands: cli.md
+  - API Reference: api.md
   - Examples: examples.md
