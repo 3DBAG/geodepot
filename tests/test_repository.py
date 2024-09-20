@@ -176,6 +176,7 @@ def test_get_local(mock_project_dir):
     p = repo.get_data_path(CaseSpec("wippolder", "wippolder.gpkg"))
     assert p.exists()
 
+
 def test_get_remote(mock_temp_project):
     """Can we get a data item from the remote repository?"""
     repo = Repository(

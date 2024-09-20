@@ -6,7 +6,7 @@ import pytest
 from geodepot.repository import Repository, Index, Status, format_indexdiffs
 from geodepot.case import CaseName, Case
 from geodepot.data import Data, DataName, BBoxSRS, BBox, Drivers
-from geodepot.config import RemoteName, User
+from geodepot.config import User
 
 
 @pytest.fixture
