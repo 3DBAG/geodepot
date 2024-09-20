@@ -7,9 +7,13 @@ on:
 #      - '*'
   workflow_dispatch:
 
-jobs:
-  all:
+permissions:
+  packages: write
+  contents: write
 
+jobs:
+
+  all:
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -149,3 +153,11 @@ jobs:
         name: ${{ matrix.artifact_name }}
         path: dist/*
         retention-days: 7
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        prerelease: true
+        repository: 3DGI/geodepot
+        token: ${{ secrets.GITHUB_TOKEN }}
+        files: dist/*
