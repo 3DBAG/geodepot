@@ -1,0 +1,28 @@
+name: Install, Lint, Format, Test
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  all:
+
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+        include:
+          - os: windows-latest
+            conda_exe: C:\Miniconda\Scripts\conda.exe
+          - os: ubuntu-latest
+            conda_exe: conda
+          - os: macos-latest
+            conda_exe: conda
+
+    steps:
+    - uses: 3DGI/geodepot/.github/workflows/workflow-install-test.yaml@main
+      with:
+        os: ${{ matrix.os }}
+        conda_exe: ${{ matrix.conda_exe }}

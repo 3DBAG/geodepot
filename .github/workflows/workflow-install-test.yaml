@@ -1,0 +1,69 @@
+name: Install, Lint, Format, Test
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        type: string
+      conda_exe:
+        type: string
+
+jobs:
+  build_test:
+
+    runs-on: ${{ inputs.os }}
+
+    strategy:
+      fail-fast: false
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: extractions/setup-just@v2
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - name: Download test data
+      run: just download-data
+
+    # Install dependencies
+    - if: runner.os == 'macOS'
+      name: Install Miniconda on macOS
+      run: |
+        mkdir -p $HOME/miniconda3
+        curl https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-arm64.sh -o $HOME/miniconda3/miniconda.sh
+        bash $HOME/miniconda3/miniconda.sh -b -u -p $HOME/miniconda3
+        rm $HOME/miniconda3/miniconda.sh
+        $HOME/miniconda3/bin/conda init bash
+        echo "CONDA=$HOME/miniconda3" >> $GITHUB_ENV
+    - if: runner.os != 'Windows'
+      name: Add conda to system path non-Windows
+      run: |
+        # $CONDA is an environment variable pointing to the root of the miniconda directory
+        echo $CONDA/bin >> $GITHUB_PATH
+    - if: runner.os == 'Windows'
+      name: Add conda to system path Windows
+      run: |
+        # $CONDA is an environment variable pointing to the root of the miniconda directory
+        echo $CONDA\Scripts >> $GITHUB_PATH
+    - name: Install dependencies
+      run: |
+        ${{ inputs.conda_exe }} install -y --name base --solver=classic conda-forge::conda-libmamba-solver conda-forge::libmamba conda-forge::libmambapy conda-forge::libarchive
+        ${{ inputs.conda_exe }} install -y --name base --solver libmamba --channel conda-forge proj=9.4 click=8.1 requests=2.32 fabric=3.2 gdal=3.9 pdal=2.7 python-pdal=3.4 pyinstaller=6.10 pytest ruff
+    - name: Re-init conda shell
+      run: |
+        ${{ inputs.conda_exe }} init --all
+    - name: Test if fucking pdal didn't fuck up gdal
+      run: |
+        python -c 'import osgeo'
+
+    # Install and test
+    - name: Install package
+      run: |
+        pip install .
+    - name: Lint
+      run: ruff check
+    - name: Format
+      run: ruff format --check
+    - name: Run unit tests
+      run: pytest
