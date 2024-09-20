@@ -23,6 +23,7 @@ theme:
     - navigation.indexes
     - search.highlight
     - search.suggest
+    - content.tabs.link
 markdown_extensions:
   # Python Markdown
   - toc:
@@ -40,4 +41,3 @@ nav:
   - Concepts: concepts.md
   - Commands: cli.md
   - API Reference: api.md
-  - Examples: examples.md

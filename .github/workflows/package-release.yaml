@@ -156,6 +156,6 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         prerelease: true
-        repository: 3DGI/geodepot
+        repository: 3DBAG/geodepot
         token: ${{ secrets.GITHUB_TOKEN }}
         files: dist/*

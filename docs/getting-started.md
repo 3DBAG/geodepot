@@ -4,40 +4,54 @@
 
 ### Command line tool
 
-!!! warning "Incomplete section"
+Download the precompiled executable from the [latest release](https://github.com/3DBAG/geodepot/releases/latest), uncompress it and run the `geodepot` executable in the `geodepot` directory.
+Note that the `geodepot` executable must remain in the `geodepot` directory, because it uses relative links to it's dependencies.
 
-```shell
-pip install geodepot
-```
+Geodepot has complex dependencies, so do not `pip install` it, unless you are developing Geodepot itself.
+Use the provided binaries instead.
 
 ### API
 
 === "C++"
 
+    If you are using CMake, use `FetchContent` (or [CPM](https://github.com/cpm-cmake/CPM.cmake)) and link against `geodepot`.
+
+    Using CMake's `FetchContent`.
+
+    ```cmake
+    FetchContent_Declare(
+      geodepot-api
+      GIT_REPOSITORY https://github.com/3DBAG/geodepot-api.git
+    )
+    FetchContent_MakeAvailable(geodepot-api)
+
+    add_executable("test_integration" "test_integration.cpp")
+    target_link_libraries("test_integration" geodepot)
+    ```
     
+    Using CPM.
+
+    ```cmake
+    CPMAddPackage("gh:3dbag/geodepot-api@1.0.4")
+    ```
 
 === "Python"
 
-    ``` python
-    git clone 
+    Use pip to build the Geodepot API and install the bindings.
+
+    ```shell
+    git clone https://github.com/3DBAG/geodepot-api.git
+    cd geodepot-api
+    pip install .
     ```
 
 === "CMake"
 
+    To add the Geodepot CMake functions to your current project, simply add the latest release of `GeoDepot.cmake` to your project's `cmake` directory, then include it.
+    Make sure you include all modules from the `cmake` directory.
+
     ```cmake
     include(GeoDepot)
-    
-    GeodepotInit("https://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot")
-    GeodepotGet("wippolder/wippolder.gpkg")
-
-    # add executables, entable tests etc...
-
-    # The GEODEPOT_DIR variable stores the path to the data in the repository that was 
-    # initialized and downloaded by GeodepotInit and GeodepotGet
-    add_test(
-          NAME "function-using-geodepot-data"
-          COMMAND test_geodepot_cmake "${GEODEPOT_DIR}/wippolder/wippolder.gpkg"
-          WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
     ```
 
 ## First time setup
