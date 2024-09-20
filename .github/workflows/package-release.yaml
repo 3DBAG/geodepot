@@ -89,7 +89,7 @@ jobs:
     - if: runner.os == 'Linux'
       name: Pyinstaller package Linux
       run: |
-        pyinstaller --name geodepot --onedir --noconfirm --optimize 2 --add-data $CONDA/share/proj/proj.db:share/proj/proj.db --collect-all pdal --collect-all osgeo src/geodepot/__main__.py
+        pyinstaller --name geodepot --onedir --noconfirm --optimize 2 --add-data $CONDA/share/proj:share/proj --collect-all pdal --collect-all osgeo src/geodepot/__main__.py
     - if: runner.os == 'macOS'
       name: Pyinstaller package macOS
       run: |
