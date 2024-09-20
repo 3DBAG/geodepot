@@ -5,7 +5,7 @@ It was born from our own requirement from writing spatial data processing tools 
 
 ## Documentation
 
-https://3DGI.github.io/geodepot
+https://3DBAG.github.io/geodepot
 
 ## Interfaces
 
@@ -13,7 +13,7 @@ https://3DGI.github.io/geodepot
 
 The main interface, it supports all operations.
 
-Repository (the current repo): https://github.com/3DGI/geodepot
+Repository (the current repo): https://github.com/3DBAG/geodepot
 
 ### API
 
@@ -26,7 +26,7 @@ The API is available in:
 - Python (binding)
 - CMake (binding)
 
-Repository: https://github.com/3DGI/geodepot-api
+Repository: https://github.com/3DBAG/geodepot-api
 
 ## Example
 

@@ -87,7 +87,7 @@ geodepot get wippolder/wippolder.gpkg
 The main interface.
 It supports all operations and you are currently reading its documentation.
 
-Repository: [https://github.com/3DGI/geodepot](https://github.com/3DGI/geodepot)
+Repository: [https://github.com/3DBAG/geodepot](https://github.com/3DBAG/geodepot)
 
 ### API
 
@@ -100,7 +100,7 @@ The API is available in:
 - Python (binding)
 - CMake (binding)
 
-Repository: [https://github.com/3DGI/geodepot-api](https://github.com/3DGI/geodepot-api)
+Repository: [https://github.com/3DBAG/geodepot-api](https://github.com/3DBAG/geodepot-api)
 
 ## What Geodepot is not
 
