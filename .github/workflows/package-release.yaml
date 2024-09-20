@@ -32,6 +32,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - if: runner.os == 'Windows'
+      name: Install wget on Windows
+      run: choco install wget
     - uses: extractions/setup-just@v2
     - name: Set up Python 3.12
       uses: actions/setup-python@v5
