@@ -30,13 +30,13 @@ jobs:
             conda_exe: conda
             geodepot_exe: /dist/geodepot/geodepot
 
-    steps:
     # Install and Test
-    - uses: 3DGI/geodepot/.github/workflows/workflow-install-test.yaml@main
-      with:
-        os: ${{ matrix.os }}
-        conda_exe: ${{ matrix.conda_exe }}
+    uses: 3DGI/geodepot/.github/workflows/workflow-install-test.yaml@main
+    with:
+      os: ${{ matrix.os }}
+      conda_exe: ${{ matrix.conda_exe }}
 
+    steps:
     # Package
     - if: runner.os == 'Linux'
       name: Pyinstaller package Linux

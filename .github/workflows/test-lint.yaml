@@ -21,8 +21,7 @@ jobs:
           - os: macos-latest
             conda_exe: conda
 
-    steps:
-    - uses: 3DGI/geodepot/.github/workflows/workflow-install-test.yaml@main
-      with:
-        os: ${{ matrix.os }}
-        conda_exe: ${{ matrix.conda_exe }}
+    uses: 3DGI/geodepot/.github/workflows/workflow-install-test.yaml@main
+    with:
+      os: ${{ matrix.os }}
+      conda_exe: ${{ matrix.conda_exe }}
