@@ -240,12 +240,12 @@ def test_format_indexdiffs(
     print(diff_all_formatted)
 
 
-def test_push_debug():
-    repo = Repository(
-        path="/home/balazs/Development/geodepot/tests/data/integration/client1/.geodepot"
-    )
-    diff_all = repo.fetch(RemoteName("ssh"))
-    repo.push(RemoteName("ssh"), diff_all)
+# def test_push_debug():
+#     repo = Repository(
+#         path="/home/balazs/Development/geodepot/tests/data/integration/client1/.geodepot"
+#     )
+#     diff_all = repo.fetch(RemoteName("ssh"))
+#     repo.push(RemoteName("ssh"), diff_all)
 
 
 # def test_format_indexdiffs_debug():

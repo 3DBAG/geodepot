@@ -24,6 +24,7 @@ The API is available in:
 
 - C++ (implementation)
 - Python (binding)
+- CMake (binding)
 
 Repository: https://github.com/3DGI/geodepot-api
 

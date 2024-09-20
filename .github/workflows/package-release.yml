@@ -1,7 +1,7 @@
 # This workflow will install Python dependencies, run tests and lint with a single version of Python
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
 
-name: Package
+name: Test, Package and Release
 
 on:
   push:
@@ -11,34 +11,42 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  all:
 
     runs-on: ${{ matrix.os }}
 
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-24.04, windows-latest, macos-latest ]
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
         include:
           - os: windows-latest
             artifact_name: geodepot-win
             conda_exe: C:\Miniconda\Scripts\conda.exe
-          - os: ubuntu-24.04
+            geodepot_exe: ${{ github.workspace }}\dist\geodepot\geodepot.exe
+          - os: ubuntu-latest
             artifact_name: geodepot-ubuntu
             conda_exe: conda
+            geodepot_exe: ${{ github.workspace }}/dist/geodepot/geodepot
           - os: macos-latest
             artifact_name: geodepot-macos
             conda_exe: conda
+            geodepot_exe: ${{ github.workspace }}/dist/geodepot/geodepot
 
     steps:
     - uses: actions/checkout@v4
+    - uses: extractions/setup-just@v2
     - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
         python-version: "3.12"
-    - if: runner.os == 'Windows'
-      run: |
-        git config --system core.longpaths true
+    - name: Download test data
+      run: just download-data
+#    - if: runner.os == 'Windows'
+#      run: |
+#        git config --system core.longpaths true
+
+    # Install dependencies
     - if: runner.os == 'macOS'
       name: Install Miniconda on macOS
       run: |
@@ -58,45 +66,69 @@ jobs:
       run: |
         # $CONDA is an environment variable pointing to the root of the miniconda directory
         echo $CONDA\Scripts >> $GITHUB_PATH
-    - name: List conda envs
-      run: ${{ matrix.conda_exe }} env list
     - name: Install dependencies
       run: |
         ${{ matrix.conda_exe }} install -y --name base --solver=classic conda-forge::conda-libmamba-solver conda-forge::libmamba conda-forge::libmambapy conda-forge::libarchive
-        ${{ matrix.conda_exe }} install -y --name base --solver libmamba --channel conda-forge proj=9.4 click=8.1 requests=2.32 fabric=3.2 gdal=3.9 pdal=2.7 python-pdal=3.4 pyinstaller=6.10
+        ${{ matrix.conda_exe }} install -y --name base --solver libmamba --channel conda-forge proj=9.4 click=8.1 requests=2.32 fabric=3.2 gdal=3.9 pdal=2.7 python-pdal=3.4 pyinstaller=6.10 pytest
     - name: Re-init conda shell
       run: |
         ${{ matrix.conda_exe }} init --all
     - name: Test if fucking pdal didn't fuck up gdal
       run: |
         python -c 'import osgeo'
+
+    # Install and test
     - name: Install package
       run: |
         pip install .
+    - name: Run unit tests
+      run: pytest
+
+    # Package
     - if: runner.os == 'Linux'
       name: Pyinstaller package Linux
       run: |
         pyinstaller --name geodepot --onedir --noconfirm --optimize 2 --add-data $CONDA/share/proj/proj.db:share/proj/proj.db --collect-all pdal --collect-all osgeo src/geodepot/__main__.py
+    - if: runner.os == 'macOS'
+      name: Pyinstaller package macOS
+      run: |
+        pyinstaller --name geodepot --onedir --console --noconfirm --optimize 2 --add-data $CONDA/share/proj/proj.db:share/proj/proj.db --collect-all pdal --collect-all osgeo src/geodepot/__main__.py
+    - if: runner.os == 'Windows'
+      name: Pyinstaller package Windows
+      run: |
+        pyinstaller --name geodepot --onedir --console --noconfirm --optimize 2 --add-data C:/Miniconda/Library/share/proj/proj.db:share/proj/proj.db --collect-all pdal --collect-all osgeo src/geodepot/__main__.py
+
+    # Test exe
+    - name: Test exe
+      run: |
+        ${{ matrix.geodepot_exe }} init
+        ${{ matrix.geodepot_exe }} add wippolder tests/data/sources/wippolder/wippolder.gpkg
+        ${{ matrix.geodepot_exe }} list
+        ${{ matrix.geodepot_exe }} show wippolder/wippolder.gpkg
+
+    # Create package archive
+    - if: runner.os == 'Linux'
+      name: Create package archive Linux
+      run: |
         cd dist
         zip -r geodepot-ubuntu.zip geodepot
         sha256sum geodepot-ubuntu.zip > geodepot-ubuntu.zip.sha256sum
         rm -rf geodepot
     - if: runner.os == 'macOS'
-      name: Pyinstaller package macOS
+      name: Create package archive macOS
       run: |
-        pyinstaller --name geodepot --onedir --console --noconfirm --optimize 2 --add-data $CONDA/share/proj/proj.db:share/proj/proj.db --collect-all pdal --collect-all osgeo src/geodepot/__main__.py
         cd dist
         zip -r geodepot-macos.zip geodepot
         shasum -a 256 geodepot-macos.zip > geodepot-macos.zip.sha256sum
         rm -rf geodepot
     - if: runner.os == 'Windows'
-      name: Pyinstaller package Windows
+      name: Create package archive Windows
       run: |
-        pyinstaller --name geodepot --onedir --console --noconfirm --optimize 2 --add-data C:/Miniconda/Library/share/proj/proj.db:share/proj/proj.db --collect-all pdal --collect-all osgeo src/geodepot/__main__.py
         cd dist
         7z a geodepot-win.zip geodepot
         certUtil -hashfile geodepot-win.zip SHA256 > geodepot-win.zip.sha256sum
         rm -r -fo geodepot
+
     - name: List contents
       run: |
         ls dist
