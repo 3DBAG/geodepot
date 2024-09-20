@@ -2,11 +2,43 @@
 
 ## Installation
 
+### Command line tool
+
 !!! warning "Incomplete section"
 
 ```shell
 pip install geodepot
 ```
+
+### API
+
+=== "C++"
+
+    
+
+=== "Python"
+
+    ``` python
+    git clone 
+    ```
+
+=== "CMake"
+
+    ```cmake
+    include(GeoDepot)
+    
+    GeodepotInit("https://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot")
+    GeodepotGet("wippolder/wippolder.gpkg")
+
+    # add executables, entable tests etc...
+
+    # The GEODEPOT_DIR variable stores the path to the data in the repository that was 
+    # initialized and downloaded by GeodepotInit and GeodepotGet
+    add_test(
+          NAME "function-using-geodepot-data"
+          COMMAND test_geodepot_cmake "${GEODEPOT_DIR}/wippolder/wippolder.gpkg"
+          WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+    ```
 
 ## First time setup
 
