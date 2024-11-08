@@ -69,3 +69,7 @@ That is, because the history of the repository is not retained, only the latest 
 The current version (`1`) is considered to be feature complete, and there are no major enhancements planned.
 This does not mean however, that the current version is bug free.
 The ongoing development focuses on fixing bugs reported by users or discovered during testing.
+
+## 3DBAG organisation
+
+This software is part of the 3DBAG project. For more information visit the [3DBAG organisation](https://github.com/3DBAG).
