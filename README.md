@@ -5,7 +5,7 @@ It was born from our own requirement from writing spatial data processing tools 
 
 ## Documentation
 
-https://3DBAG.github.io/geodepot
+https://innovation.3dbag.nl/geodepot
 
 ## Interfaces
 
