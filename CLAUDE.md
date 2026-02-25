@@ -29,6 +29,12 @@ src/geodepot/          # Main package
 tests/                 # Unit tests with pytest
   conftest.py          # Pytest fixtures for test data and mocking
   test_*.py            # Test modules for each major component
+  data/integration/    # Test data for integration tests (server/, client0/, client1/)
+docker/                # Docker-based integration test server
+  Dockerfile           # Ubuntu 22.04 with nginx + openssh-server
+  entrypoint.sh        # Startup script for nginx and sshd
+  nginx_server.conf    # Nginx config for serving /srv/geodepot
+docker-compose.yml     # Compose definition for test server
 docs/                  # MkDocs documentation
 design-doc.md          # Detailed design document with concepts and examples
 ```
@@ -65,6 +71,16 @@ pip install .           # Build and install package
 just download-data      # Download test data (uses justfile)
 just upload-data        # Upload test data to remote server
 ```
+
+### Integration Test Server
+```bash
+just server-up          # Start Docker-based test server (nginx + sshd)
+just server-down        # Stop test server
+```
+
+The test server provides:
+- **HTTP**: `http://localhost:8080/geodepot` for pull operations
+- **SSH**: `ssh://root@localhost:2222:/srv/geodepot` for push operations (pubkey auth via `~/.ssh/id_rsa.pub`)
 
 ## Architecture Notes
 
@@ -105,9 +121,21 @@ just upload-data        # Upload test data to remote server
 ## Testing Strategy
 
 - **Unit tests**: Test individual components (repository operations, config, data parsing)
-- **Integration tests**: Test collaborative workflows (push/pull conflicts)
+- **Integration tests**: Test collaborative workflows (push/pull conflicts) using Docker test server
 - **Fixtures**: Mock user home, project directory, use real test data in tests/data/
 - **Test data**: Includes spatial datasets like wippolder.gpkg, various CRS examples
+
+## Integration Test Server
+
+The Docker-based test server (`docker-compose.yml`) provides a lightweight alternative to Vagrant:
+
+- **Service**: Ubuntu 22.04 container running nginx + openssh-server
+- **HTTP endpoint**: Serves `/srv/geodepot` on port 8080 for pull operations (directory listing)
+- **SSH endpoint**: SSH access on port 2222 for push operations (pubkey auth)
+- **Volume mount**: `tests/data/integration/server/` synced to `/srv/geodepot` in container
+- **SSH auth**: Automatically injects `~/.ssh/id_rsa.pub` via `SSH_PUBLIC_KEY` environment variable
+
+Start with `just server-up`, connect via `ssh://root@localhost:2222:/srv/geodepot` for pushes.
 
 ## Important Details
 
