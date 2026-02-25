@@ -33,3 +33,6 @@
 styles/
 .vale-styles/
 site/
+# pixi environments
+.pixi/*
+!.pixi/config.toml
