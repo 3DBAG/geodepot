@@ -11,6 +11,7 @@ from osgeo.ogr import UseExceptions as ogrUseExceptions
 
 from geodepot import GEODEPOT_INDEX_EPSG
 from geodepot.config import User
+from geodepot.errors import GeodepotDataError
 
 logger = getLogger(__name__)
 
@@ -138,7 +139,7 @@ class Data:
             return Drivers.GDAL, gdal_format
         if (pdal_format := try_pdal(path)) is not None:
             return Drivers.PDAL, pdal_format
-        raise ValueError(f"Cannot determine format of {path}")
+        raise GeodepotDataError(f"Cannot determine format of {path}")
 
     def _compute_bbox(self, path: Path) -> BBoxSRS:
         from osgeo.osr import SpatialReference, CreateCoordinateTransformation
@@ -149,8 +150,7 @@ class Data:
         if self.driver == Drivers.CITYJSON:
             with path.open() as f:
                 cj = load(f)
-                metadata = cj.get("metadata")
-                srs = metadata.get("referenceSystem")
+                srs = (cj.get("metadata") or {}).get("referenceSystem")
                 if "vertices" in cj:
                     t = cj.get(
                         "transform",
@@ -188,13 +188,13 @@ class Data:
                                 bbox_srs.bbox_epsg_3857 = BBox(
                                     *ct.TransformBounds(minx, maxx, miny, maxy, 21)
                                 )
-                            except Exception as e:
+                            except RuntimeError as e:
                                 logger.error(
                                     f"Could not reproject the bounding box of {path} to EPSG:{target_epsg} with exception: {e}"
                                 )
                     return bbox_srs
                 else:
-                    raise ValueError(
+                    raise GeodepotDataError(
                         f"Cannot compute bounding box for {path}, file does not contain a 'vertices' member"
                     )
         elif self.driver == Drivers.GDAL:
@@ -228,7 +228,7 @@ class Data:
                                 extent[0], extent[1], extent[2], extent[3], 21
                             )
                         )
-                    except Exception as e:
+                    except RuntimeError as e:
                         logger.error(
                             f"Could not reproject the bounding box of {path} to EPSG:{target_epsg} with exception: {e}"
                         )
@@ -256,7 +256,7 @@ class Data:
                                 extent[0], extent[2], extent[1], extent[3], 21
                             )
                         )
-                    except Exception as e:
+                    except RuntimeError as e:
                         logger.error(
                             f"Could not reproject the bounding box of {path} to EPSG:{target_epsg} with exception: {e}"
                         )
@@ -296,7 +296,7 @@ class Data:
                 )
             return bbox_srs
         else:
-            raise ValueError(f"Unknown driver: {self.driver}")
+            raise GeodepotDataError(f"Unknown driver: {self.driver}")
 
     @classmethod
     def from_ogr_feature(cls, feature) -> Self:
@@ -366,7 +366,7 @@ def try_pdal(path: Path) -> str | None:
             return reader.type.replace("readers.", "")
         else:
             return None
-    except RuntimeError:
+    except Exception:
         return None
 
 
@@ -376,7 +376,7 @@ def try_ogr(path: Path) -> str | None:
     try:
         with ogrOpen(path) as ogr_dataset:
             return ogr_dataset.GetDriver().GetName()
-    except RuntimeError:
+    except Exception:
         return None
 
 
@@ -387,7 +387,7 @@ def try_gdal(path: Path) -> str | None:
         with gdalOpenEx(path) as gdal_dataset:
             lname = gdal_dataset.GetDriver().LongName
             return lname if lname is not None else gdal_dataset.GetDriver().ShortName
-    except RuntimeError:
+    except Exception:
         return None
 
 

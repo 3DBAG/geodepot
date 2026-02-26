@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from json import dumps, load, loads, JSONEncoder
+from json import dumps, load, loads, JSONDecodeError, JSONEncoder
 from logging import getLogger
 from pathlib import Path
 from typing import Self, NewType
@@ -142,12 +142,17 @@ class Config:
     @classmethod
     def load(cls, path: Path) -> Self:
         logger.debug(f"Reading config from file: {path}")
-        with path.open() as f:
-            c = load(f, object_hook=as_config)
-            # An empty config is serialized as an empty JSON object '{}', so the
-            # deserializer 'as_config' will return a dict and not an empty Config
-            # instance.
-            return c if not isinstance(c, dict) else Config(user=User(), remotes=dict())
+        try:
+            with path.open() as f:
+                c = load(f, object_hook=as_config)
+                # An empty config is serialized as an empty JSON object '{}', so the
+                # deserializer 'as_config' will return a dict and not an empty Config
+                # instance.
+                return c if not isinstance(c, dict) else Config(user=User(), remotes=dict())
+        except (FileNotFoundError, JSONDecodeError) as e:
+            raise GeodepotInvalidConfiguration(
+                f"Failed to load configuration from {path}"
+            ) from e
 
     def write(self, path: Path) -> None:
         logger.debug(f"Writing config to file: {path}")
@@ -321,7 +326,7 @@ def config_list() -> list[str]:
 def remote_list() -> list[str]:
     output = []
     config = get_config()
-    if config is not None:
+    if config is not None and config.remotes is not None:
         for k, v in config.remotes.items():
             output.append(f"{k} {v.url}")
     return output
@@ -329,11 +334,19 @@ def remote_list() -> list[str]:
 
 def remote_add(name: str, url: str):
     config = get_local_config()
+    if config is None:
+        raise GeodepotInvalidConfiguration(
+            "No local configuration found. Run 'geodepot init' first."
+        )
     config.add_remote(name, url)
     config.write(get_local_config_path())
 
 
 def remote_remove(name: str):
     config = get_local_config()
+    if config is None:
+        raise GeodepotInvalidConfiguration(
+            "No local configuration found. Run 'geodepot init' first."
+        )
     config.remove_remote(name)
     config.write(get_local_config_path())
