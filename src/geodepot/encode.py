@@ -14,4 +14,4 @@ class DataClassEncoder(JSONEncoder):
         if is_dataclass(o):
             return {k: v for k, v in asdict(o).items() if v is not None}
         else:
-            return super().default(0)
+            return super().default(o)

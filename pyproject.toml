@@ -41,6 +41,9 @@ Repository = "https://github.com/3DGI/geodepot.git"
 Issues = "https://github.com/3DGI/geodepot/issues"
 Changelog = "https://github.com/3DGI/geodepot/blob/main/CHANGELOG.md"
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.ruff]
 src = ["src", "tests"]
 
@@ -73,5 +76,13 @@ geodepot = { path = ".", editable = true }
 [tool.pixi.environments]
 default = { solve-group = "default" }
 dev = { features = ["dev"], solve-group = "default" }
+
+[tool.pixi.feature.dev.pypi-dependencies]
+pytest = ">=9.0"
+pyinstaller = "==6.10.*"
+ruff = "*"
+bumpver = "*"
+mkdocs = "*"
+mkdocs-material = "*"
 
 [tool.pixi.tasks]

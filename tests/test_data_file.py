@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from geodepot.data import Data, is_cityjson, try_ogr, try_pdal
@@ -44,3 +46,18 @@ class TestFormatInference:
     )
     def test_pdal(self, wippolder_dir, file, expected):
         assert try_pdal(wippolder_dir / file) == expected
+
+
+def test_cityjson_no_metadata_no_crash(tmp_path):
+    """Data() must not crash on valid CityJSON that lacks a 'metadata' key."""
+    cj = {
+        "type": "CityJSON",
+        "version": "1.1",
+        "vertices": [[0, 0, 0], [1, 0, 0], [1, 1, 0]],
+        "CityObjects": {},
+        "transform": {"scale": [1.0, 1.0, 1.0], "translate": [0.0, 0.0, 0.0]},
+    }
+    p = tmp_path / "test.city.json"
+    p.write_text(json.dumps(cj))
+    data = Data(p)
+    assert data.name == "test.city.json"

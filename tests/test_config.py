@@ -10,6 +10,7 @@ from geodepot.config import (
     as_config,
     get_global_config_path,
     configure,
+    remote_list,
 )
 
 
@@ -217,3 +218,9 @@ def test_remote_create(url_with_path, url, path, is_ssh):
         assert remote.is_ssh is False
         assert remote.url == url
         assert remote.path_index == f"{url}/index.geojson"
+
+
+def test_remote_list_no_remotes_returns_empty(mock_user_home, mock_temp_project):
+    """remote_list() must return [] on a fresh repo with no remotes configured."""
+    Repository(create=True)
+    assert remote_list() == []

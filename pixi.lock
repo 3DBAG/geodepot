@@ -469,7 +469,7 @@ packages:
 - pypi: ./
   name: geodepot
   version: 1.0.3
-  sha256: 88adb822ad906d308dea6f80eb32bb8286deabf5b5d3e07d1952ba6701ee624a
+  sha256: 7d702784a8e7dcbf720cfdb37a648d4af541bab79ddc49c6323353d364505758
   requires_dist:
   - gdal==3.9.*
   - pdal==3.4.*
