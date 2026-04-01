@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-04-01
+
 - Switched release packaging to Pixi-based bundles instead of PyInstaller.
 - Added top-level launcher wrappers that activate the bundled runtime before starting `geodepot`.
 - Added POSIX and PowerShell installer scripts for downloading and installing release bundles.
