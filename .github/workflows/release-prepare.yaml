@@ -91,19 +91,23 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION=$(grep '^version = ' pyproject.toml | head -1 | cut -d'"' -f2)
+          BODY=$(cat << 'EOF'
+          ## Release vVERSION
+
+          This PR prepares the release of version VERSION.
+
+          ### Changes included
+          - Version bumped to VERSION
+          - CHANGELOG updated with release date
+          - pixi.lock regenerated to match new version
+
+          ### Next steps
+          After this PR is merged to main, the release tag will be created automatically, which will trigger the package build and GitHub release creation.
+          EOF
+          )
+          BODY="${BODY//VERSION/$VERSION}"
           gh pr create \
             --base main \
             --head develop \
             --title "Release v${VERSION}" \
-            --body "## Release v${VERSION}
-
-This PR prepares the release of version \`${VERSION}\`.
-
-### Changes included
-- Version bumped to \`${VERSION}\`
-- CHANGELOG updated with release date
-- pixi.lock regenerated to match new version
-
-### Next steps
-After this PR is merged to main, the release tag will be created automatically, which will trigger the package build and GitHub release creation.
-"
+            --body "$BODY"
