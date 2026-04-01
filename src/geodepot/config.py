@@ -148,7 +148,11 @@ class Config:
                 # An empty config is serialized as an empty JSON object '{}', so the
                 # deserializer 'as_config' will return a dict and not an empty Config
                 # instance.
-                return c if not isinstance(c, dict) else Config(user=User(), remotes=dict())
+                return (
+                    c
+                    if not isinstance(c, dict)
+                    else Config(user=User(), remotes=dict())
+                )
         except (FileNotFoundError, JSONDecodeError) as e:
             raise GeodepotInvalidConfiguration(
                 f"Failed to load configuration from {path}"

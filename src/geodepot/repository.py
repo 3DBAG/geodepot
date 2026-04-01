@@ -220,9 +220,7 @@ class Index:
             raise
         except Exception as e:
             tmp_path.unlink(missing_ok=True)
-            raise GeodepotIndexError(
-                f"Failed to serialize index to {path}"
-            ) from e
+            raise GeodepotIndexError(f"Failed to serialize index to {path}") from e
 
     @classmethod
     def load(cls, path: Path | str) -> Self:
@@ -252,9 +250,7 @@ class Index:
         except GeodepotIndexError:
             raise
         except Exception as e:
-            raise GeodepotIndexError(
-                f"Failed to deserialize index from {path}"
-            ) from e
+            raise GeodepotIndexError(f"Failed to deserialize index from {path}") from e
         return Index(cases=cases_in_index)
 
     def diff(self, other: Self) -> list[IndexDiff]:
@@ -795,9 +791,7 @@ class Repository:
                 try:
                     result = conn_ssh.run(f"mkdir -p {shlex.quote(case_path_remote)}")
                     if not result.ok:
-                        errors.append(
-                            (str(data), RuntimeError(result.stderr))
-                        )
+                        errors.append((str(data), RuntimeError(result.stderr)))
                         continue
                 except Exception as e:
                     errors.append((str(data), e))
@@ -969,7 +963,10 @@ class Repository:
         """Decompresses a data entry into the repository."""
         try:
             with TarFile(path, mode="r") as tf:
-                tf.extractall(path=self.path_cases / casespec.case_name)
+                tf.extractall(
+                    path=self.path_cases / casespec.case_name,
+                    filter="data",
+                )
             return True
         except (tarfile.TarError, OSError) as e:
             raise GeodepotRuntimeError(f"Failed to decompress {path}") from e
