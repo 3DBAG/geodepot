@@ -12,5 +12,5 @@ if exist "%CONDA_PREFIX%\etc\conda\activate.d" (
     for %%F in ("%CONDA_PREFIX%\etc\conda\activate.d\*.bat") do call "%%~fF"
 )
 
-"%CONDA_PREFIX%\Scripts\geodepot.exe" %*
+"%CONDA_PREFIX%\python.exe" -m geodepot %*
 exit /b %ERRORLEVEL%

@@ -10,5 +10,5 @@ if (Test-Path $activateDir) {
     }
 }
 
-& (Join-Path $env:CONDA_PREFIX "Scripts\geodepot.exe") @args
+& (Join-Path $env:CONDA_PREFIX "python.exe") -m geodepot @args
 exit $LASTEXITCODE
