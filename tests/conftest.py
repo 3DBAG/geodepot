@@ -37,7 +37,7 @@ def monkeysession():
 
 @pytest.fixture(scope="session", autouse=True)
 def mock_proj_lib(monkeysession, data_dir):
-    monkeysession.setenv("PROJ_LIB", data_dir)
+    monkeysession.setenv("PROJ_LIB", str(data_dir))
 
 
 @pytest.fixture(scope="function")
