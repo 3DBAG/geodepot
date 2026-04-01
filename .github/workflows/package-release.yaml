@@ -175,6 +175,7 @@ jobs:
           retention-days: 7
 
       - name: Release
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
