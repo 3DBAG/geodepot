@@ -134,6 +134,16 @@ It is assumed that the data that you store in a Geodepot repository is already a
 Thus, if the repository is accidentally overwritten with unwanted changes, the desired state can be recreated with some effort.
 That is, because the history of the repository is not retained, only the latest version is available at any time.
 
+## License
+
+Geodepot is licensed under the Apache License 2.0 (see [LICENSE](LICENSE) file).
+
+The release bundles include third-party open source software with the following licenses:
+- **GDAL** (MIT), **PROJ** (MIT), **PDAL** (BSD 3-Clause)
+- **Python** (PSF License), **Click** (BSD 3-Clause), **Requests** (Apache 2.0), **Fabric** (BSD 3-Clause)
+
+A complete list of bundled dependencies and their licenses is included in `THIRD_PARTY_LICENSES.md` in the release bundle and in this repository.
+
 ## Roadmap
 
 The current version (`1`) is considered to be feature complete, and there are no major enhancements planned.

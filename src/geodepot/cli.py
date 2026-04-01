@@ -20,6 +20,7 @@ from geodepot.config import (
     RemoteName,
 )
 from geodepot.errors import GeodepotInvalidRepository, GeodepotSyncError
+from geodepot.licenses import print_licenses
 from geodepot.repository import Repository, format_indexdiffs
 
 
@@ -30,6 +31,14 @@ def abort_if_false(ctx, param, value):
 
 @group()
 @version_option()
+@option(
+    "--license",
+    is_flag=True,
+    callback=print_licenses,
+    is_eager=True,
+    expose_value=False,
+    help="Show Geodepot and third-party software licenses.",
+)
 @option(
     "--verbose",
     " /-v",

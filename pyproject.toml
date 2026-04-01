@@ -54,7 +54,7 @@ commit_message = "bump version {old_version} -> {new_version}"
 tag_message = "{new_version}"
 tag_scope = "default"
 commit = true
-tag = true
+tag = false
 push = false
 
 [tool.bumpver.file_patterns]

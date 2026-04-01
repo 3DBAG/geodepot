@@ -116,6 +116,9 @@ jobs:
           cp packaging/install/geodepot-install.ps1 dist/geodepot-install.ps1
           chmod 755 dist/geodepot-install.sh
 
+      - name: Add license documentation to bundle
+        run: cp THIRD_PARTY_LICENSES.md dist/geodepot/THIRD_PARTY_LICENSES.md
+
       - if: runner.os != 'Windows'
         name: Smoke test bundle non-Windows
         run: |
