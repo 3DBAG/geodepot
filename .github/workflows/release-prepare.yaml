@@ -42,7 +42,7 @@ jobs:
           locked: false
 
       - name: Bump version (files only, no commit)
-        run: pixi run -e dev bumpver update --${{ inputs.bump_type }} --no-commit --no-push --no-tag
+        run: pixi run -e dev bumpver update --${{ inputs.bump_type }} --no-commit --no-push
 
       - name: Update CHANGELOG with release date
         run: |
