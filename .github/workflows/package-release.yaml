@@ -29,13 +29,13 @@ jobs:
             platform_id: macos
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - if: runner.os == 'Windows'
         name: Install wget on Windows
         run: choco install wget
 
-      - uses: prefix-dev/setup-pixi@v0.9.3
+      - uses: prefix-dev/setup-pixi@v0.9.4
         with:
           manifest-path: pyproject.toml
           environments: >-
@@ -168,16 +168,19 @@ jobs:
         run: ls dist
 
       - name: Upload binaries to
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact_name }}
           path: dist/*
           retention-days: 7
 
       - name: Release
-        uses: softprops/action-gh-release@v2
-        with:
-          prerelease: true
-          repository: 3DBAG/geodepot
-          token: ${{ secrets.GITHUB_TOKEN }}
-          files: dist/*
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if gh release view "$TAG" --repo 3DBAG/geodepot > /dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --repo 3DBAG/geodepot --clobber
+          else
+            gh release create "$TAG" dist/* --repo 3DBAG/geodepot --prerelease --title "$TAG" --generate-notes
+          fi
