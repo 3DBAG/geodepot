@@ -64,25 +64,49 @@ push = false
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]
-platforms = ["linux-64"]
+platforms = ["linux-64", "win-64", "osx-64", "osx-arm64"]
+preview = ["pixi-build"]
 
 [tool.pixi.dependencies]
+click = "8.1.*"
+fabric = "3.2.*"
 gdal = "3.9.*"
+python = "3.12.*"
 python-pdal = "3.4.*"
+requests = "2.32.*"
 
-[tool.pixi.pypi-dependencies]
-geodepot = { path = ".", editable = true }
+[tool.pixi.feature.local.dependencies]
+geodepot = { path = "." }
+
+[tool.pixi.package]
+name = "geodepot"
+version = "1.0.3"
+
+[tool.pixi.package.build]
+backend = { name = "pixi-build-python", version = "*", channels = ["https://prefix.dev/pixi-build-backends", "conda-forge"] }
+
+[tool.pixi.package.build.config]
+ignore-pypi-mapping = true
+
+[tool.pixi.package.build-dependencies]
+python = "3.12.*"
+
+[tool.pixi.package.host-dependencies]
+hatchling = "*"
+
+[tool.pixi.package.run-dependencies]
+click = "8.1.*"
+fabric = "3.2.*"
+gdal = "3.9.*"
+python = "3.12.*"
+python-pdal = "3.4.*"
+requests = "2.32.*"
 
 [tool.pixi.environments]
-default = { solve-group = "default" }
-dev = { features = ["dev"], solve-group = "default" }
-
-[tool.pixi.feature.dev.pypi-dependencies]
-pytest = ">=9.0"
-pyinstaller = "==6.10.*"
-ruff = "*"
-bumpver = "*"
-mkdocs = "*"
-mkdocs-material = "*"
+default = { solve-group = "runtime" }
+dev = { features = ["local", "dev"], solve-group = "dev" }
 
 [tool.pixi.tasks]
+lint = "ruff check"
+format-check = "ruff format --check"
+test = "pytest"

@@ -4,8 +4,100 @@
 
 ### Command line tool
 
-Download the precompiled executable from the [latest release](https://github.com/3DBAG/geodepot/releases/latest), uncompress it and run the `geodepot` executable in the `geodepot` directory.
-Note that the `geodepot` executable must remain in the `geodepot` directory, because it uses relative links to it's dependencies.
+#### Quick install
+
+The release installer downloads the matching release bundle for the current platform, verifies its checksum, and installs a wrapper command.
+
+=== "Linux / macOS"
+
+    ```shell
+    curl -fsSL https://github.com/3DBAG/geodepot/releases/latest/download/geodepot-install.sh | sh
+    ```
+
+=== "Windows"
+
+    ```powershell
+    Invoke-RestMethod https://github.com/3DBAG/geodepot/releases/latest/download/geodepot-install.ps1 | Invoke-Expression
+    ```
+
+The installers support installing a specific version as well.
+
+=== "Linux / macOS"
+
+    ```shell
+    curl -fsSL https://github.com/3DBAG/geodepot/releases/latest/download/geodepot-install.sh | sh -s -- --version v1.0.3
+    ```
+
+=== "Windows"
+
+    ```powershell
+    $script = Invoke-RestMethod https://github.com/3DBAG/geodepot/releases/latest/download/geodepot-install.ps1
+    & ([scriptblock]::Create($script)) -Version v1.0.3
+    ```
+
+The default install locations are:
+
+- Linux and macOS bundle: `~/.local/share/geodepot`
+- Linux and macOS wrapper: `~/.local/bin/geodepot`
+- Windows bundle: `%LOCALAPPDATA%\geodepot`
+- Windows wrappers: `%USERPROFILE%\.local\bin\geodepot.cmd` and `%USERPROFILE%\.local\bin\geodepot.ps1`
+
+The Windows installer updates the user `PATH` when needed.
+The POSIX installer prints the `PATH` change you need if `~/.local/bin` is not already available in your shell.
+
+#### Manual install
+
+Download a release bundle from the [latest release](https://github.com/3DBAG/geodepot/releases/latest) and extract it.
+Keep the extracted `geodepot` directory intact.
+
+The release bundle contains two parts:
+
+- a bundled runtime environment in `env/`
+- a top-level launcher that activates that runtime and then starts Geodepot
+
+The launcher names are:
+
+- Linux and macOS: `geodepot`
+- Windows: `geodepot.cmd` and `geodepot.ps1`
+
+Typical extracted layout:
+
+=== "Linux / macOS"
+
+    ```text
+    geodepot/
+    ├── geodepot
+    └── env/
+    ```
+
+=== "Windows"
+
+    ```text
+    geodepot/
+    ├── geodepot.cmd
+    ├── geodepot.ps1
+    └── env/
+    ```
+
+Run the top-level launcher, not the executable inside `env/`.
+The nested executable does not activate the bundled GDAL, PROJ, and PDAL environment on its own and may fail with missing `proj.db` or plugin lookup errors.
+
+=== "Linux / macOS"
+
+    ```shell
+    cd geodepot
+    ./geodepot --help
+    ```
+
+=== "Windows"
+
+    ```powershell
+    cd geodepot
+    .\geodepot.cmd --help
+    ```
+
+If you want to use Geodepot from any working directory, add the extracted `geodepot` directory itself to `PATH`.
+Do not copy or symlink the launcher to another directory, because it locates the bundled runtime relative to its own path.
 
 Geodepot has complex dependencies, so do not `pip install` it, unless you are developing Geodepot itself.
 Use the provided binaries instead.
@@ -171,4 +263,3 @@ geodepot remote add origin ssh://user@server:/path/to/.geodepot
 
 The supported protocols are HTTP, HTTPS, SSH, SFTP. 
 The `pull` and `push` commands only support the SSH and SFTP protocols.
-

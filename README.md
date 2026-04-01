@@ -7,6 +7,60 @@ It was born from our own requirement from writing spatial data processing tools 
 
 https://innovation.3dbag.nl/geodepot
 
+## Installation
+
+### Quick install
+
+The release installer downloads the correct bundle for the current platform, verifies the published checksum, and installs a small wrapper on `PATH`.
+
+Linux and macOS:
+
+```shell
+curl -fsSL https://github.com/3DBAG/geodepot/releases/latest/download/geodepot-install.sh | sh
+```
+
+Windows PowerShell:
+
+```powershell
+Invoke-RestMethod https://github.com/3DBAG/geodepot/releases/latest/download/geodepot-install.ps1 | Invoke-Expression
+```
+
+The installers also support `--version` for installing a specific tag.
+
+### Manual install
+
+Download a release bundle from the [latest release](https://github.com/3DBAG/geodepot/releases/latest), extract it, and keep the extracted directory intact.
+
+The release bundle contains a relocatable runtime environment in `env/` plus a small launcher at the top level.
+
+Linux and macOS:
+
+```text
+geodepot/
+├── geodepot
+└── env/
+```
+
+Windows:
+
+```text
+geodepot/
+├── geodepot.cmd
+├── geodepot.ps1
+└── env/
+```
+
+Run the top-level launcher, not the nested executable in `env/`.
+The launcher activates the bundled GDAL, PROJ, and PDAL runtime before starting Geodepot.
+
+- Linux and macOS: `./geodepot`
+- Windows: `.\geodepot.cmd`
+
+If you want to use Geodepot from anywhere, add the extracted `geodepot` directory itself to `PATH`.
+Do not symlink or copy the launcher out of that directory, because it locates the bundled runtime relative to its own path.
+
+Geodepot has complex native dependencies, so do not `pip install` it unless you are developing Geodepot itself.
+
 ## Interfaces
 
 ### Command-line tool (CLI)

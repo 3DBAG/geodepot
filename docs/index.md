@@ -9,6 +9,22 @@ Collecting and organizing good test data is a tedious, time consuming process, a
 Geodepot helps to organize data into test cases, share them and provide integration to some of the test frameworks for ease of use.
 It was born from our own experience of writing spatial data processing tools over the past years.
 
+## Installation
+
+Download a release bundle from the [latest release](https://github.com/3DBAG/geodepot/releases/latest), extract it, and run the top-level launcher from the extracted `geodepot` directory.
+The bundle contains a launcher plus an `env/` runtime directory that must stay next to each other.
+
+- Linux and macOS: run `./geodepot`
+- Windows: run `.\geodepot.cmd`
+
+Do not invoke the executable inside `env/` directly.
+The launcher is responsible for activating the bundled GDAL, PROJ, and PDAL runtime before Geodepot starts.
+
+For a one-command install, use the versioned installer scripts attached to each release:
+
+- Linux and macOS: `curl -fsSL https://github.com/3DBAG/geodepot/releases/latest/download/geodepot-install.sh | sh`
+- Windows PowerShell: `Invoke-RestMethod https://github.com/3DBAG/geodepot/releases/latest/download/geodepot-install.ps1 | Invoke-Expression`
+
 ## Example
 
 The minimal example below gives and idea of how Geodepot works.
