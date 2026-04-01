@@ -1,3 +1,6 @@
+import os
+import shlex
+import tarfile
 from dataclasses import dataclass, field, fields
 from enum import Enum, auto
 from itertools import groupby
@@ -31,6 +34,8 @@ from geodepot.errors import (
     GeodepotRuntimeError,
     GeodepotInvalidRepository,
     GeodepotInvalidConfiguration,
+    GeodepotIndexError,
+    GeodepotSyncError,
 )
 
 UseExceptions()
@@ -140,6 +145,7 @@ class Index:
         )
         from osgeo.osr import SpatialReference
 
+        tmp_path = path.with_name(path.name + ".tmp")
         try:
             INDEX_SRS = SpatialReference()
             INDEX_SRS.ImportFromEPSG(GEODEPOT_INDEX_EPSG)
@@ -159,10 +165,7 @@ class Index:
                 FieldDefn("data_extent_original_srs", OFTString),
             )
             fid = 0
-            # We simple write a new index on serialization
-            if path.exists():
-                path.exists()
-            with GetDriverByName("GeoJSON").CreateDataSource(path) as ds:
+            with GetDriverByName("GeoJSON").CreateDataSource(tmp_path) as ds:
                 # Layer definition
                 lyr = ds.CreateLayer(
                     "index",
@@ -207,22 +210,26 @@ class Index:
                             feat["data_srs"] = None
                             feat["data_extent_original_srs"] = None
                         if lyr.CreateFeature(feat) != OGRERR_NONE:
-                            logger.error(
+                            raise GeodepotIndexError(
                                 f"Failed to create OGR Feature on the layer from {data}"
                             )
                         fid += 1
+            os.replace(tmp_path, path)
+        except GeodepotIndexError:
+            tmp_path.unlink(missing_ok=True)
+            raise
         except Exception as e:
-            logger.critical(
-                f"Failed to serialize index with exception '{e}', repository is probably in an invalid state."
-            )
+            tmp_path.unlink(missing_ok=True)
+            raise GeodepotIndexError(
+                f"Failed to serialize index to {path}"
+            ) from e
 
     @classmethod
-    def load(cls, path: Path | str) -> Self | None:
+    def load(cls, path: Path | str) -> Self:
         """If 'path' is string, it is expected to be a URL with HTTP protocol."""
         if isinstance(path, Path):
             if not path.exists():
-                logger.critical(f"Index path {path} does not exist")
-                return None
+                raise GeodepotIndexError(f"Index path {path} does not exist")
         from osgeo.ogr import GetDriverByName
 
         cases_in_index = {}
@@ -242,9 +249,12 @@ class Index:
                     df = Data.from_ogr_feature(feat)
                     case.add_data(df)
                     cases_in_index[case_name] = case
+        except GeodepotIndexError:
+            raise
         except Exception as e:
-            logger.critical(f"Failed to deserialize index with exception '{e}'")
-            return None
+            raise GeodepotIndexError(
+                f"Failed to deserialize index from {path}"
+            ) from e
         return Index(cases=cases_in_index)
 
     def diff(self, other: Self) -> list[IndexDiff]:
@@ -474,14 +484,18 @@ class Repository:
             # If a data path is provided, we always update the data item description,
             # even if the casespec only refers to a case, not the data item itself.
             data_description = description
-        # Get an existing case or create an new if not exists
-        if (case := self.get_case(casespec)) is None:
+        # Get an existing case or create a new one if not exists
+        existing_case = self.get_case(casespec)
+        case_was_new = existing_case is None
+        if case_was_new:
             try:
                 case = self.init_case(casespec)
             except FileExistsError:
                 raise GeodepotInvalidRepository(
                     f"The data for {casespec} is in the repository, but the index does not contain an entry for {casespec}. Try manually removing {casespec} from {self.path_cases} and re-adding it with 'geodepot add'."
                 )
+        else:
+            case = existing_case
         # Update the description of an existing case
         if case_description is not None:
             case.description = case_description
@@ -527,8 +541,11 @@ class Repository:
                     else:
                         rmtree(destination)
                 else:
-                    logger.critical(
-                        f"Failed to compress {destination} and {path_archive} does not exist"
+                    destination.unlink(missing_ok=True)
+                    if case_was_new:
+                        self.index.remove_case(casespec.case_name)
+                    raise GeodepotRuntimeError(
+                        f"Failed to compress {destination}; {path_archive} does not exist"
                     )
                 logger.info(f"Added {data.name} to {case.name}")
                 logger.debug(data.to_pretty())
@@ -602,8 +619,8 @@ class Repository:
                             f"Trying to download {casespec} from a remote, but the config does not contain a remote with name {remote_name}."
                         )
                 if archive.exists():
-                    success = self._decompress_data(archive, casespec)
-                    if success and data_path.exists():
+                    self._decompress_data(archive, casespec)
+                    if data_path.exists():
                         return data_path
                     else:
                         logger.error(
@@ -629,11 +646,12 @@ class Repository:
         If 'remote' is provided, download and load the index from the remote.
         """
         if remote is None:
-            self.index = Index.load(self.path_index)
-            if self.index is None:
+            try:
+                self.index = Index.load(self.path_index)
+            except GeodepotIndexError as e:
                 raise GeodepotInvalidRepository(
                     f"Could not load index from {self.path_index}"
-                )
+                ) from e
         else:
             remote = self.config.remotes.get(remote)
             if remote is None:
@@ -661,7 +679,12 @@ class Repository:
             else:
                 remote_index_url = remote_index_path
             if remote_index_url is not None:
-                self.index_remote = Index.load(remote_index_url)
+                try:
+                    self.index_remote = Index.load(remote_index_url)
+                except GeodepotIndexError as e:
+                    raise GeodepotRuntimeError(
+                        f"Could not load the remote index from {remote.url}."
+                    ) from e
             else:
                 raise GeodepotRuntimeError(
                     f"Something went wrong, could not load the index from {remote.url}."
@@ -693,10 +716,9 @@ class Repository:
         )
 
         conn_ssh = Connection(remote.ssh_host)
+        errors: list[tuple[str, Exception]] = []
 
         for data in data_to_download:
-            _ = self.path_cases.joinpath(data.to_path())
-            # data_path_remote = "/".join([remote.path_cases, str(data)])
             casespec_archive = str(data) + ARCHIVE_EXTENSION
             archive_path_remote = "/".join([remote.path_cases, casespec_archive])
             local_case_archive = self.path_cases / casespec_archive
@@ -705,27 +727,33 @@ class Repository:
                     local=str(local_case_archive), remote=archive_path_remote
                 )
             except Exception as e:
-                logger.error(
-                    f"Failed to download {data} from remote {remote.name} with:\n{e}"
-                )
+                errors.append((str(data), e))
         for data in data_to_delete:
             if data.is_case:
                 try:
                     rmtree(self.path_cases.joinpath(data.to_path()))
                 except Exception as e:
-                    logger.error(f"Failed to delete local {data} with error: {e}")
+                    errors.append((str(data), e))
             else:
                 try:
                     self.path_cases.joinpath(data.to_path()).unlink()
                 except Exception as e:
-                    logger.error(f"Failed to delete local {data} with error: {e}")
+                    errors.append((str(data), e))
+
+        if errors:
+            raise GeodepotSyncError(
+                f"Failed to sync {len(errors)} item(s): "
+                + ", ".join(name for name, _ in errors)
+            )
 
         try:
             logger.debug(f"GET local={self.path_index}, remote={remote.path_index}")
             _ = conn_ssh.get(local=str(self.path_index), remote=str(remote.path_index))
             logger.info(f"Downloaded {GEODEPOT_INDEX} from {remote_name}")
         except Exception as e:
-            logger.error(f"Failed to download {GEODEPOT_INDEX} with error: {e}")
+            raise GeodepotSyncError(
+                f"Failed to download {GEODEPOT_INDEX} from {remote_name}"
+            ) from e
 
     def push(self, remote_name: RemoteName, diff_all: list[IndexDiff]):
         """Overwrite the remote repository with the changes in the local."""
@@ -757,6 +785,7 @@ class Repository:
         )
 
         conn_ssh = Connection(remote.ssh_host)
+        errors: list[tuple[str, Exception]] = []
 
         for data in data_to_upload:
             if data.is_case:
@@ -764,15 +793,15 @@ class Repository:
                 case_path_remote = "/".join([remote.path_cases, str(data)])
                 # Create the case dir
                 try:
-                    result = conn_ssh.run(f"mkdir -p {case_path_remote}")
+                    result = conn_ssh.run(f"mkdir -p {shlex.quote(case_path_remote)}")
                     if not result.ok:
-                        logger.error(
-                            f"Failed to create directory {case_path_remote} on {remote.name} with:\n{result.stderr}"
+                        errors.append(
+                            (str(data), RuntimeError(result.stderr))
                         )
+                        continue
                 except Exception as e:
-                    logger.error(
-                        f"Failed to create directory {case_path_remote} on {remote.name} with:\n{e}:"
-                    )
+                    errors.append((str(data), e))
+                    continue
                 # Upload each archive in the case
                 for dirpath, dirnames, filenames in self.path_cases.joinpath(
                     data.to_path()
@@ -794,9 +823,7 @@ class Repository:
                                 )
                                 logger.info(f"Uploaded {data} to {remote.name}")
                             except Exception as e:
-                                logger.error(
-                                    f"Failed to upload {data} to {remote.name} with:\n{e}"
-                                )
+                                errors.append((str(data), e))
             else:
                 # Upload a single data file
                 casespec_archive = str(data) + ARCHIVE_EXTENSION
@@ -811,7 +838,7 @@ class Repository:
                     )
                     logger.info(f"Uploaded {data} to {remote.name}")
                 except Exception as e:
-                    logger.error(f"Failed to upload {data} to {remote.name} with:\n{e}")
+                    errors.append((str(data), e))
         for data in data_to_delete:
             casespec_archive = str(data) + ARCHIVE_EXTENSION
             archive_path_remote = "/".join([remote.path_cases, casespec_archive])
@@ -819,27 +846,31 @@ class Repository:
                 if data.is_case:
                     # Delete a whole case
                     case_path_remote = "/".join([remote.path_cases, str(data)])
-                    result = conn_ssh.run(f"rm -rf {case_path_remote}")
+                    result = conn_ssh.run(f"rm -rf {shlex.quote(case_path_remote)}")
                 else:
                     # Delete a data file
-                    result = conn_ssh.run(f"rm {archive_path_remote}")
+                    result = conn_ssh.run(f"rm {shlex.quote(archive_path_remote)}")
                 if not result.ok:
-                    logger.error(
-                        f"Failed to delete {data} on {remote.name} with:\n{result.stderr}"
-                    )
+                    errors.append((str(data), RuntimeError(result.stderr)))
                 else:
                     logger.info(f"Deleted {data} on {remote.name}")
             except Exception as e:
-                logger.error(f"Failed to delete {data} on {remote.name} with:\n{e}")
+                errors.append((str(data), e))
+
+        if errors:
+            raise GeodepotSyncError(
+                f"Failed to sync {len(errors)} item(s): "
+                + ", ".join(name for name, _ in errors)
+            )
 
         try:
             logger.debug(f"PUT local={self.path_index}, remote={remote.path_index}")
             _ = conn_ssh.put(self.path_index, remote=remote.path_index)
             logger.info(f"Transferred {GEODEPOT_INDEX} to {remote.name}")
         except Exception as e:
-            logger.error(
-                f"Failed to transfer {GEODEPOT_INDEX} to {remote.name} with:\n{e}"
-            )
+            raise GeodepotSyncError(
+                f"Failed to transfer {GEODEPOT_INDEX} to {remote.name}"
+            ) from e
 
     def remove(self, casespec: CaseSpec):
         """Remove an entry from the repository."""
@@ -862,7 +893,7 @@ class Repository:
                     else:
                         p.unlink(missing_ok=True)
                         (p.parent / (p.name + ARCHIVE_EXTENSION)).unlink(
-                            missing_ok=False
+                            missing_ok=True
                         )
                         # TODO: I could remove the whole case if there are no more files. Don't forget to remove the case from the index too.
                     self.index.write(self.path_index)
@@ -940,9 +971,8 @@ class Repository:
             with TarFile(path, mode="r") as tf:
                 tf.extractall(path=self.path_cases / casespec.case_name)
             return True
-        except Exception as e:
-            logger.critical(f"Failed to decompress {path} with:\n{e}")
-        return False
+        except (tarfile.TarError, OSError) as e:
+            raise GeodepotRuntimeError(f"Failed to decompress {path}") from e
 
     def _load_from_path(self, path: Path) -> None:
         """Load a repository from a local path.

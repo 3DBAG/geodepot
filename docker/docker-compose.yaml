@@ -1,0 +1,12 @@
+name: geodepot
+
+services:
+  server:
+    build: .
+    ports:
+      - "8080:80"    # HTTP for pull
+      - "2222:22"    # SSH for push
+    volumes:
+      - ../tests/data/integration/server:/srv/geodepot
+    environment:
+      - SSH_PUBLIC_KEY=${SSH_PUBLIC_KEY:-}

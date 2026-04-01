@@ -41,3 +41,4 @@ nav:
   - Concepts: concepts.md
   - Commands: cli.md
   - API Reference: api.md
+  - Developing: developing.md

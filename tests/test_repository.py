@@ -1,4 +1,5 @@
 from copy import deepcopy
+from pathlib import Path
 
 import pytest
 
@@ -6,6 +7,7 @@ from geodepot.repository import Repository, Index
 from geodepot.case import CaseSpec, CaseName
 from geodepot.data import DataName
 from geodepot.config import RemoteName
+from geodepot.errors import GeodepotIndexError, GeodepotRuntimeError
 
 
 @pytest.fixture(scope="function")
@@ -184,3 +186,35 @@ def test_get_remote(mock_temp_project):
     )
     data_path = repo.get_data_path(CaseSpec("wippolder", "wippolder.gpkg"))
     assert data_path.exists()
+
+
+def test_index_load_missing_raises(tmp_path):
+    """Index.load() must raise GeodepotIndexError, not return None."""
+    with pytest.raises(GeodepotIndexError):
+        Index.load(tmp_path / "nonexistent.geojson")
+
+
+def test_index_load_corrupt_raises(tmp_path):
+    """Index.load() must raise GeodepotIndexError on corrupt GeoJSON."""
+    p = tmp_path / "bad.geojson"
+    p.write_text("not json {{{")
+    with pytest.raises(GeodepotIndexError):
+        Index.load(p)
+
+
+def test_add_rollback_on_compress_failure(repo, wippolder_dir, monkeypatch):
+    """If compression fails, the index must not be updated and no orphan file left."""
+    monkeypatch.setattr(repo, "_compress_data", lambda p: Path("/nonexistent.tar"))
+    with pytest.raises(GeodepotRuntimeError):
+        repo.add("wippolder", pathspec=str(wippolder_dir / "wippolder.gpkg"))
+    case = repo.get_case(CaseSpec("wippolder"))
+    assert case is None or len(case.data) == 0
+    assert not (repo.path_cases / "wippolder" / "wippolder.gpkg").exists()
+
+
+def test_remove_missing_archive_ok(repo, wippolder_dir):
+    """remove() must succeed even when the .tar archive is already gone."""
+    repo.add("wippolder", pathspec=str(wippolder_dir / "wippolder.gpkg"))
+    (repo.path_cases / "wippolder" / "wippolder.gpkg.tar").unlink()
+    repo.remove(CaseSpec("wippolder", "wippolder.gpkg"))  # must not raise
+    assert repo.get_data(CaseSpec("wippolder", "wippolder.gpkg")) is None

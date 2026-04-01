@@ -19,7 +19,8 @@ from geodepot.config import (
     remote_remove,
     RemoteName,
 )
-from geodepot.errors import GeodepotInvalidRepository
+from geodepot.errors import GeodepotInvalidRepository, GeodepotSyncError
+from geodepot.licenses import print_licenses
 from geodepot.repository import Repository, format_indexdiffs
 
 
@@ -30,6 +31,14 @@ def abort_if_false(ctx, param, value):
 
 @group()
 @version_option()
+@option(
+    "--license",
+    is_flag=True,
+    callback=print_licenses,
+    is_eager=True,
+    expose_value=False,
+    help="Show Geodepot and third-party software licenses.",
+)
 @option(
     "--verbose",
     " /-v",
@@ -213,7 +222,11 @@ def pull_cmd(ctx, name, force_yes):
             f"The local differs from the remote '{name}' repository in the details listed above. Do you want to overwrite the local with the remote data? [y/n]: "
         ).lower() in ("y", "yes")
     if yes_input:
-        repo.pull(remote_name=RemoteName(name), diff_all=diff_all)
+        try:
+            repo.pull(remote_name=RemoteName(name), diff_all=diff_all)
+        except GeodepotSyncError as e:
+            ctx.obj["logger"].error(str(e))
+            exit(1)
     else:
         ctx.obj["logger"].info("Exiting without pulling the remote changes.")
 
@@ -246,7 +259,11 @@ def push_cmd(ctx, name, force_yes):
             f"The remote '{name}' differs from the local repository in the details listed above. Do you want to overwrite the remote with the local data? [y/n]: "
         ).lower() in ("y", "yes")
     if yes_input:
-        repo.push(remote_name=RemoteName(name), diff_all=diff_all)
+        try:
+            repo.push(remote_name=RemoteName(name), diff_all=diff_all)
+        except GeodepotSyncError as e:
+            ctx.obj["logger"].error(str(e))
+            exit(1)
     else:
         ctx.obj["logger"].info("Exiting without pushing the local changes.")
 

@@ -8,3 +8,15 @@ class GeodepotInvalidRepository(Exception):
 
 class GeodepotInvalidConfiguration(Exception):
     """Invalid configuration value."""
+
+
+class GeodepotIndexError(Exception):
+    """Raised when reading or writing the index file fails."""
+
+
+class GeodepotDataError(Exception):
+    """Raised when processing a data item fails."""
+
+
+class GeodepotSyncError(Exception):
+    """Raised when a push or pull operation fails."""
