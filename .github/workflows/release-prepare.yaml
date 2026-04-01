@@ -41,47 +41,43 @@ jobs:
           activate-environment: dev
           locked: false
 
-      - name: Bump version and update pyproject.toml + CHANGELOG
-        run: pixi run -e dev bumpver update --${{ inputs.bump_type }} --no-push --no-tag
+      - name: Bump version (files only, no commit)
+        run: pixi run -e dev bumpver update --${{ inputs.bump_type }} --no-commit --no-push --no-tag
 
       - name: Update CHANGELOG with release date
         run: |
-          python << 'EOF'
+          python3 -c "
           import re
           from datetime import date
 
-          # Read version from pyproject.toml
-          with open("pyproject.toml", "r") as f:
-              content = f.read()
-              match = re.search(r'^version = "([^"]+)"', content, re.MULTILINE)
-              version = match.group(1) if match else "unknown"
+          with open('pyproject.toml') as f:
+              m = re.search(r'^version = \"([^\"]+)\"', f.read(), re.MULTILINE)
+              version = m.group(1)
 
-          # Update CHANGELOG: replace first [Unreleased] with versioned section
           today = date.today().isoformat()
-          with open("CHANGELOG", "r") as f:
+          with open('CHANGELOG') as f:
               changelog = f.read()
 
-          # Replace first occurrence: ## [Unreleased] -> ## [Unreleased]\n\n## [VERSION] - DATE
           changelog = changelog.replace(
-              "## [Unreleased]",
-              f"## [Unreleased]\n\n## [{version}] - {today}",
-              1
+              '## [Unreleased]',
+              f'## [Unreleased]\n\n## [{version}] - {today}',
+              1,
           )
 
-          with open("CHANGELOG", "w") as f:
+          with open('CHANGELOG', 'w') as f:
               f.write(changelog)
 
-          print(f"Updated CHANGELOG for version {version} - {today}")
-          EOF
+          print(f'Updated CHANGELOG for version {version} - {today}')
+          "
 
       - name: Regenerate pixi.lock with new version
-        run: pixi install
+        run: pixi lock
 
-      - name: Stage and amend bump commit
+      - name: Commit version bump
         run: |
-          git add CHANGELOG pixi.lock
-          # Only amend if there are changes to stage
-          git diff --staged --quiet || git commit --amend --no-edit
+          VERSION=$(grep '^version = ' pyproject.toml | head -1 | cut -d'"' -f2)
+          git add pyproject.toml CHANGELOG pixi.lock
+          git commit -m "bump version to ${VERSION}"
 
       - name: Push develop
         run: git push origin develop
@@ -91,23 +87,21 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION=$(grep '^version = ' pyproject.toml | head -1 | cut -d'"' -f2)
-          BODY=$(cat << 'EOF'
-          ## Release vVERSION
+          gh pr create \
+            --base main \
+            --head develop \
+            --title "Release v${VERSION}" \
+            --body "$(cat <<EOF
+          ## Release v${VERSION}
 
-          This PR prepares the release of version VERSION.
+          This PR prepares the release of version ${VERSION}.
 
           ### Changes included
-          - Version bumped to VERSION
+          - Version bumped to ${VERSION}
           - CHANGELOG updated with release date
           - pixi.lock regenerated to match new version
 
           ### Next steps
           After this PR is merged to main, the release tag will be created automatically, which will trigger the package build and GitHub release creation.
           EOF
-          )
-          BODY="${BODY//VERSION/$VERSION}"
-          gh pr create \
-            --base main \
-            --head develop \
-            --title "Release v${VERSION}" \
-            --body "$BODY"
+          )"
