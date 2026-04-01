@@ -20,4 +20,4 @@ if [ -d "${ACTIVATE_DIR}" ]; then
     done
 fi
 
-exec "${CONDA_PREFIX}/bin/geodepot" "$@"
+exec "${CONDA_PREFIX}/bin/python" -m geodepot "$@"

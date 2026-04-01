@@ -4,7 +4,7 @@ requires = ["hatchling"]
 
 [project]
 name = "geodepot"
-version = "1.0.6"
+version = "1.0.7"
 authors = [
     {name = "Balázs Dukai", email = "balazs.dukai@3dgi.nl"},
     {name = "Ravi Peters", email = "ravi.peters@3dgi.nl"}
@@ -48,7 +48,7 @@ testpaths = ["tests"]
 src = ["src", "tests"]
 
 [tool.bumpver]
-current_version = "1.0.6"
+current_version = "1.0.7"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message = "bump version {old_version} -> {new_version}"
 tag_message = "{new_version}"
@@ -80,7 +80,7 @@ geodepot = { path = "." }
 
 [tool.pixi.package]
 name = "geodepot"
-version = "1.0.6"
+version = "1.0.7"
 
 [tool.pixi.package.build]
 backend = { name = "pixi-build-python", version = "*", channels = ["https://prefix.dev/pixi-build-backends", "conda-forge"] }
