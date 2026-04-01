@@ -1,16 +1,34 @@
-server := "3dgi-server"
+set shell := ["bash", "-uc"]
 
 _default:
     @just --list
 
+# Use `pixi` for project tooling and environment-managed commands.
+# These recipes are thin wrappers so `just` remains the single entry point.
+lint:
+    pixi run -e dev lint
+
+format:
+    pixi run -e dev format
+
+format-check:
+    pixi run -e dev format-check
+
+test:
+    pixi run -e dev test
+
+docs-build:
+    pixi run -e dev docs-build
+
+docs-deploy:
+    pixi run -e dev docs-deploy
+
 download-data:
-    wget https://data.3dgi.xyz/geodepot-test-data/data.zip
-    unzip -o data.zip
-    rm data.zip
+    pixi run -e dev download-data
 
 upload-data:
     zip -r -9 data.zip tests/data
-    rsync data.zip {{server}}:/var/www/3dgi-data/geodepot-test-data
+    rsync data.zip 3dgi-server:/var/www/3dgi-data/geodepot-test-data
     rm data.zip
 
 up:

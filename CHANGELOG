@@ -6,6 +6,7 @@
 - Added top-level launcher wrappers that activate the bundled runtime before starting `geodepot`.
 - Added POSIX and PowerShell installer scripts for downloading and installing release bundles.
 - Updated the user-facing install and release docs for the new bundle layout and installer flow.
+- Consolidated developer recipes around Pixi and `just`, and removed the old PyInstaller experiment files.
 
 ## [1.0.0] - TBD
 

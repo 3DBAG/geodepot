@@ -60,6 +60,22 @@ If you want to use Geodepot from anywhere, add the extracted `geodepot` director
 Do not symlink or copy the launcher out of that directory, because it locates the bundled runtime relative to its own path.
 
 Geodepot has complex native dependencies, so do not `pip install` it unless you are developing Geodepot itself.
+Use `pixi` to set up the development environment and run tools.
+
+## Developer Recipes
+
+Use `just` as the local entry point. The recipes below all delegate to `pixi` so the toolchain stays in one place.
+
+- `just lint`
+- `just format`
+- `just format-check`
+- `just test`
+- `just docs-build`
+- `just docs-deploy`
+- `just download-data`
+- `just upload-data`
+- `just up`
+- `just down`
 
 ## Interfaces
 

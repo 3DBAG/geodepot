@@ -29,7 +29,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest", "pyinstaller==6.10.*", "ruff", "bumpver", "mkdocs", "mkdocs-material"]
+dev = ["pytest", "ruff", "bumpver", "mkdocs", "mkdocs-material"]
 
 [project.scripts]
 geodepot = "geodepot:__main__.geodepot_grp"
@@ -108,5 +108,9 @@ dev = { features = ["local", "dev"], solve-group = "dev" }
 
 [tool.pixi.tasks]
 lint = "ruff check"
+format = "ruff format"
 format-check = "ruff format --check"
 test = "pytest"
+docs-build = "mkdocs build"
+docs-deploy = "mkdocs gh-deploy --force"
+download-data = "python -c \"from pathlib import Path; import urllib.request; import zipfile; url = 'https://data.3dgi.xyz/geodepot-test-data/data.zip'; archive = Path('data.zip'); urllib.request.urlretrieve(url, archive); zipfile.ZipFile(archive).extractall(); archive.unlink()\""

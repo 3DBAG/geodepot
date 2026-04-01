@@ -101,6 +101,7 @@ Do not copy or symlink the launcher to another directory, because it locates the
 
 Geodepot has complex dependencies, so do not `pip install` it, unless you are developing Geodepot itself.
 Use the provided binaries instead.
+For development, use `pixi` to create the environment and run the project tools.
 
 ### API
 
@@ -129,12 +130,12 @@ Use the provided binaries instead.
 
 === "Python"
 
-    Use pip to build the Geodepot API and install the bindings.
+    Use `pixi` or `pip` to build the Geodepot API and install the bindings.
 
     ```shell
     git clone https://github.com/3DBAG/geodepot-api.git
     cd geodepot-api
-    pip install .
+    pixi run -e dev python -m pip install .
     ```
 
 === "CMake"
