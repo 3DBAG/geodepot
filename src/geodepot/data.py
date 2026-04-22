@@ -6,17 +6,11 @@ from logging import getLogger
 from pathlib import Path
 from typing import NewType, Self
 
-from osgeo.gdal import UseExceptions as gdalUseExceptions
-from osgeo.ogr import UseExceptions as ogrUseExceptions
-
 from geodepot import GEODEPOT_INDEX_EPSG
 from geodepot.config import User
 from geodepot.errors import GeodepotDataError
 
 logger = getLogger(__name__)
-
-gdalUseExceptions()
-ogrUseExceptions()
 
 pdal_filter_stats = {"type": "filters.stats", "dimensions": "X,Y"}
 

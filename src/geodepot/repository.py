@@ -11,8 +11,6 @@ from tarfile import TarFile
 from typing import Self, Any
 from urllib.parse import urlparse
 
-from osgeo.ogr import UseExceptions
-
 from geodepot import (
     ARCHIVE_EXTENSION,
     GEODEPOT_CONFIG_LOCAL,
@@ -38,7 +36,6 @@ from geodepot.errors import (
     GeodepotSyncError,
 )
 
-UseExceptions()
 logger = getLogger(__name__)
 
 
@@ -133,6 +130,12 @@ class Index:
         return self.cases.pop(case_name, None)
 
     def write(self, path: Path):
+        if len(self.cases) == 0:
+            path.write_text(
+                '{"type":"FeatureCollection","name":"index","crs":{"type":"name","properties":{"name":"urn:ogc:def:crs:EPSG::3857"}},"features":[]}'
+            )
+            return
+
         from osgeo.ogr import (
             GetDriverByName,
             FieldDefn,
