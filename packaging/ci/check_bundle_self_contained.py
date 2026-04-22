@@ -64,7 +64,9 @@ def parse_args() -> argparse.Namespace:
 
 
 def iter_regular_files(root: Path) -> list[Path]:
-    return [path for path in root.rglob("*") if path.is_file() and not path.is_symlink()]
+    return [
+        path for path in root.rglob("*") if path.is_file() and not path.is_symlink()
+    ]
 
 
 def read_prefixes(args: argparse.Namespace) -> list[bytes]:
@@ -142,7 +144,12 @@ def audit_linux(files: list[Path], bundle_root: Path, bundle_names: set[str]) ->
     library_dirs = bundle_library_dirs(bundle_root)
     if library_dirs:
         clean_env["LD_LIBRARY_PATH"] = ":".join(
-            library_dirs + ([clean_env["LD_LIBRARY_PATH"]] if clean_env.get("LD_LIBRARY_PATH") else [])
+            library_dirs
+            + (
+                [clean_env["LD_LIBRARY_PATH"]]
+                if clean_env.get("LD_LIBRARY_PATH")
+                else []
+            )
         )
     for path in files:
         if not is_elf(path):
@@ -156,7 +163,9 @@ def audit_linux(files: list[Path], bundle_root: Path, bundle_names: set[str]) ->
         )
         output = "\n".join(filter(None, [result.stdout, result.stderr]))
         if "not found" in output:
-            raise RuntimeError(f"Bundle file {path} has unresolved shared libraries:\n{output}")
+            raise RuntimeError(
+                f"Bundle file {path} has unresolved shared libraries:\n{output}"
+            )
         for line in output.splitlines():
             if "=>" not in line:
                 continue
@@ -165,7 +174,9 @@ def audit_linux(files: list[Path], bundle_root: Path, bundle_names: set[str]) ->
                 continue
             resolved_path = resolved.split("(", 1)[0].strip()
             if not resolved_path or resolved_path == "not found":
-                raise RuntimeError(f"Bundle file {path} has unresolved dependency {dep_name}.")
+                raise RuntimeError(
+                    f"Bundle file {path} has unresolved dependency {dep_name}."
+                )
             if resolved_path.startswith(tuple(LINUX_SYSTEM_PREFIXES)):
                 if basename(dep_name) in bundle_names:
                     raise RuntimeError(
@@ -246,7 +257,9 @@ def parse_pe_imports(path: Path) -> list[str]:
     elif magic == 0x20B:
         data_directory_offset = optional_offset + 112
     else:
-        raise RuntimeError(f"{path} has an unsupported PE optional header magic 0x{magic:x}.")
+        raise RuntimeError(
+            f"{path} has an unsupported PE optional header magic 0x{magic:x}."
+        )
     import_rva = _read_u32(data, data_directory_offset + 8)
     if import_rva == 0:
         return []
@@ -290,7 +303,10 @@ def audit_windows(files: list[Path], bundle_names: set[str]) -> None:
                 continue
             if dep_lower in WINDOWS_SYSTEM_DLLS:
                 continue
-            if any(fnmatch.fnmatch(dep_lower, pattern) for pattern in WINDOWS_SYSTEM_PATTERNS):
+            if any(
+                fnmatch.fnmatch(dep_lower, pattern)
+                for pattern in WINDOWS_SYSTEM_PATTERNS
+            ):
                 continue
             raise RuntimeError(f"Bundle file {path} depends on missing DLL {dep}.")
 
@@ -299,7 +315,9 @@ def main() -> int:
     args = parse_args()
     bundle_root = args.bundle.resolve()
     if not bundle_root.is_dir():
-        raise SystemExit(f"Bundle root {bundle_root} does not exist or is not a directory.")
+        raise SystemExit(
+            f"Bundle root {bundle_root} does not exist or is not a directory."
+        )
 
     files = iter_regular_files(bundle_root)
     bundle_names = {path.name.lower() for path in files}
