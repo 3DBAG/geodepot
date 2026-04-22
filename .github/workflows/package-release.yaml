@@ -122,9 +122,10 @@ jobs:
         run: |
           # The bundle does not use MKL's MPI-backed BLACS/scaLAPACK helpers.
           # Keeping them would make the archive depend on an external MPI runtime.
-          Remove-Item -Force `
-            dist\geodepot\env\Library\bin\mkl_blacs_*.dll `
-            dist\geodepot\env\Library\bin\mkl_scalapack_*.dll `
+          Remove-Item -Path @(
+            'dist\geodepot\env\Library\bin\mkl_blacs_*.dll'
+            'dist\geodepot\env\Library\bin\mkl_scalapack_*.dll'
+          ) -Force `
             -ErrorAction SilentlyContinue
 
       - if: runner.os == 'Linux'
