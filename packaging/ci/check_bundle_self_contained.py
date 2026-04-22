@@ -26,6 +26,7 @@ WINDOWS_SYSTEM_DLLS = {
     "msvcrt.dll",
     "msi.dll",
     "ntdll.dll",
+    "iphlpapi.dll",
     "ole32.dll",
     "oleaut32.dll",
     "rpcrt4.dll",
