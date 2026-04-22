@@ -100,7 +100,23 @@ jobs:
           # are not needed and may contain build-path references.
           rm -rf activate* deactivate*
           if [ -d env/bin ]; then
-            find env/bin -maxdepth 1 \( -type f -o -type l \) -exec grep -Il "${GITHUB_WORKSPACE}" {} + | xargs -r rm -f
+            python - <<'PY'
+from pathlib import Path
+import os
+
+prefix = os.environ["GITHUB_WORKSPACE"].encode()
+bin_dir = Path("env/bin")
+
+if bin_dir.is_dir():
+    for path in bin_dir.iterdir():
+        if path.is_dir():
+            continue
+        try:
+            if prefix in path.read_bytes():
+                path.unlink()
+        except OSError:
+            pass
+PY
           fi
           install -m 755 ../../packaging/pixi/geodepot.sh ./geodepot
 
@@ -115,9 +131,23 @@ jobs:
           # are not needed and may contain build-path references.
           Remove-Item -Recurse -Force activate*, deactivate* -ErrorAction SilentlyContinue
           if (Test-Path env\bin) {
-            Get-ChildItem env\bin -Force | Where-Object { -not $_.PSIsContainer } | Select-String -SimpleMatch $env:GITHUB_WORKSPACE -List | ForEach-Object {
-              Remove-Item -Force $_.Path
-            }
+            @'
+from pathlib import Path
+import os
+
+prefix = os.environ["GITHUB_WORKSPACE"].encode()
+bin_dir = Path("env/bin")
+
+if bin_dir.is_dir():
+    for path in bin_dir.iterdir():
+        if path.is_dir():
+            continue
+        try:
+            if prefix in path.read_bytes():
+                path.unlink()
+        except OSError:
+            pass
+'@ | python -
           }
           Pop-Location
           Copy-Item packaging\pixi\geodepot.cmd dist\geodepot\geodepot.cmd
