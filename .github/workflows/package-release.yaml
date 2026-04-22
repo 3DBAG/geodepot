@@ -96,6 +96,9 @@ jobs:
           pixi exec --spec pixi-pack -- pixi-pack --environment default --inject "$GEODEPOT_CONDA" --output-file dist/environment.tar pyproject.toml
           cd dist/geodepot
           pixi exec --spec pixi-unpack -- pixi-unpack ../environment.tar
+          # The wrapper starts Geodepot directly; the generated activation scripts
+          # are not needed and may contain build-path references.
+          rm -rf activate* deactivate*
           install -m 755 ../../packaging/pixi/geodepot.sh ./geodepot
 
       - if: runner.os == 'Windows'
@@ -105,6 +108,9 @@ jobs:
           pixi exec --spec pixi-pack -- pixi-pack --environment default --inject "$env:GEODEPOT_CONDA" --output-file dist/environment.tar pyproject.toml
           Push-Location dist\geodepot
           pixi exec --spec pixi-unpack -- pixi-unpack ..\environment.tar
+          # The wrapper starts Geodepot directly; the generated activation scripts
+          # are not needed and may contain build-path references.
+          Remove-Item -Recurse -Force activate*, deactivate* -ErrorAction SilentlyContinue
           Pop-Location
           Copy-Item packaging\pixi\geodepot.cmd dist\geodepot\geodepot.cmd
           Copy-Item packaging\pixi\geodepot.ps1 dist\geodepot\geodepot.ps1
