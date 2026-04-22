@@ -7,7 +7,10 @@ import pytest
 
 
 MODULE = runpy.run_path(
-    Path(__file__).resolve().parents[1] / "packaging" / "ci" / "check_bundle_self_contained.py"
+    Path(__file__).resolve().parents[1]
+    / "packaging"
+    / "ci"
+    / "check_bundle_self_contained.py"
 )
 
 
