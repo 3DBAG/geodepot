@@ -37,6 +37,26 @@ WINDOWS_SYSTEM_PATTERNS = (
     "api-ms-win-*.dll",
     "ext-ms-*.dll",
 )
+TEXT_SUFFIXES = {
+    ".bat",
+    ".cmd",
+    ".cfg",
+    ".ini",
+    ".json",
+    ".md",
+    ".py",
+    ".ps1",
+    ".rst",
+    ".sh",
+    ".toml",
+    ".txt",
+    ".xml",
+    ".yaml",
+    ".yml",
+}
+TEXT_BASENAMES = {
+    "geodepot",
+}
 ELF_MAGIC = b"\x7fELF"
 MACHO_MAGICS = {
     0xFEEDFACE,
@@ -77,11 +97,27 @@ def read_prefixes(args: argparse.Namespace) -> list[bytes]:
     return [prefix.encode("utf-8") for prefix in prefixes if prefix]
 
 
+def is_text_candidate(path: Path) -> bool:
+    name = path.name.lower()
+    if name in TEXT_BASENAMES or path.suffix.lower() in TEXT_SUFFIXES:
+        return True
+    if path.parent.name == "bin":
+        try:
+            with path.open("rb") as handle:
+                sample = handle.read(4096)
+        except OSError:
+            return False
+        return b"\0" not in sample
+    return False
+
+
 def scan_forbidden_strings(files: list[Path], prefixes: list[bytes]) -> None:
     if not prefixes:
         return
     longest = max(len(prefix) for prefix in prefixes)
     for path in files:
+        if not is_text_candidate(path):
+            continue
         tail = b""
         try:
             with path.open("rb") as handle:
