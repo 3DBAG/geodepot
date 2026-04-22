@@ -14,6 +14,7 @@ MAC_SYSTEM_PREFIXES = ("/System/Library/", "/usr/lib/")
 WINDOWS_SYSTEM_DLLS = {
     "advapi32.dll",
     "bcrypt.dll",
+    "bcryptprimitives.dll",
     "comdlg32.dll",
     "cabinet.dll",
     "crypt32.dll",
