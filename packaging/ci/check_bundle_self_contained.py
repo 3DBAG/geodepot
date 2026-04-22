@@ -39,6 +39,7 @@ WINDOWS_SYSTEM_DLLS = {
     "ucrtbase.dll",
     "user32.dll",
     "version.dll",
+    "wsock32.dll",
     "dxgi.dll",
     "winmm.dll",
     "ws2_32.dll",
