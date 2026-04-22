@@ -29,6 +29,7 @@ WINDOWS_SYSTEM_DLLS = {
     "iphlpapi.dll",
     "ole32.dll",
     "oleaut32.dll",
+    "propsys.dll",
     "rpcrt4.dll",
     "shell32.dll",
     "shlwapi.dll",
