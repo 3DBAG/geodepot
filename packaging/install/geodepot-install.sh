@@ -54,8 +54,21 @@ resolve_tag() {
         return
     fi
 
-    curl -fsSL -H "Accept: application/vnd.github+json" "${API_BASE}/repos/${REPO}/releases/latest" \
-        | awk -F'"' '/"tag_name":/ {print $4; exit}'
+    release_json=$(mktemp)
+    if ! curl -fsSL -H "Accept: application/vnd.github+json" "${API_BASE}/repos/${REPO}/releases/latest" -o "$release_json"; then
+        rm -f "$release_json"
+        exit 1
+    fi
+
+    tag_name=$(awk -F'"' '/"tag_name":/ {print $4; exit}' "$release_json")
+    rm -f "$release_json"
+
+    if [ -z "$tag_name" ]; then
+        echo "Could not resolve the latest release tag from GitHub." >&2
+        exit 1
+    fi
+
+    printf '%s\n' "$tag_name"
 }
 
 resolve_platform() {
