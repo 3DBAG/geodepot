@@ -33,6 +33,10 @@ require_cmd() {
     fi
 }
 
+log() {
+    printf '%s\n' "$*" >&2
+}
+
 sha256_file() {
     if command -v sha256sum >/dev/null 2>&1; then
         sha256sum "$1" | awk '{print $1}'
@@ -54,8 +58,21 @@ resolve_tag() {
         return
     fi
 
-    curl -fsSL -H "Accept: application/vnd.github+json" "${API_BASE}/repos/${REPO}/releases/latest" \
-        | awk -F'"' '/"tag_name":/ {print $4; exit}'
+    release_json=$(mktemp)
+    if ! curl -fsSL -H "Accept: application/vnd.github+json" "${API_BASE}/repos/${REPO}/releases/latest" -o "$release_json"; then
+        rm -f "$release_json"
+        exit 1
+    fi
+
+    tag_name=$(awk -F'"' '/"tag_name":/ {print $4; exit}' "$release_json")
+    rm -f "$release_json"
+
+    if [ -z "$tag_name" ]; then
+        echo "Could not resolve the latest release tag from GitHub." >&2
+        exit 1
+    fi
+
+    printf '%s\n' "$tag_name"
 }
 
 resolve_platform() {
@@ -156,11 +173,23 @@ done
 require_cmd curl
 require_cmd unzip
 
+log "Starting Geodepot installation."
+log "Detecting platform and release bundle."
 platform=$(resolve_platform)
 arch=$(resolve_arch)
+
+if [ "$VERSION" = "latest" ]; then
+    log "Resolving latest release tag from GitHub."
+else
+    log "Installing requested version: ${VERSION}."
+fi
+
 tag=$(resolve_tag)
 asset=$(resolve_asset "$tag" "$platform" "$arch")
 checksum_asset="${asset}.sha256sum"
+
+log "Using release ${tag} for ${platform}/${arch}."
+log "Selected bundle ${asset}."
 
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT HUP INT TERM
@@ -168,9 +197,11 @@ trap 'rm -rf "$tmpdir"' EXIT HUP INT TERM
 archive_path="${tmpdir}/${asset}"
 checksum_path="${tmpdir}/${checksum_asset}"
 
+log "Downloading bundle and checksum."
 curl -fsSL -o "$archive_path" "${DOWNLOAD_BASE}/${tag}/${asset}"
 curl -fsSL -o "$checksum_path" "${DOWNLOAD_BASE}/${tag}/${checksum_asset}"
 
+log "Verifying checksum."
 expected_hash=$(awk '{print $1}' "$checksum_path")
 actual_hash=$(sha256_file "$archive_path")
 
@@ -183,9 +214,11 @@ release_dir="${INSTALL_ROOT}/releases/${tag}"
 bundle_dir="${release_dir}/geodepot"
 current_dir="${INSTALL_ROOT}/current"
 
+log "Installing into ${bundle_dir}."
 mkdir -p "${INSTALL_ROOT}/releases"
 rm -rf "$release_dir"
 mkdir -p "$release_dir"
+log "Extracting bundle."
 unzip -q "$archive_path" -d "$release_dir"
 
 if [ ! -f "${bundle_dir}/geodepot" ]; then
@@ -193,10 +226,12 @@ if [ ! -f "${bundle_dir}/geodepot" ]; then
     exit 1
 fi
 
+log "Updating current symlink."
 rm -rf "$current_dir"
 ln -s "$bundle_dir" "$current_dir"
 
 if [ "$NO_WRAPPER" -eq 0 ]; then
+    log "Installing wrapper in ${BIN_DIR}."
     mkdir -p "$BIN_DIR"
     cat > "${BIN_DIR}/geodepot" <<EOF
 #!/usr/bin/env sh

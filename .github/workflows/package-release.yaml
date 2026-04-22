@@ -119,25 +119,34 @@ jobs:
       - name: Add license documentation to bundle
         run: cp THIRD_PARTY_LICENSES.md dist/geodepot/THIRD_PARTY_LICENSES.md
 
+      - name: Audit bundle dependencies
+        run: python packaging/ci/check_bundle_self_contained.py dist/geodepot
+
       - if: runner.os != 'Windows'
         name: Smoke test bundle non-Windows
         run: |
-          env -u CONDA_PREFIX -u CONDA_DEFAULT_ENV -u PYTHONPATH -u PROJ_LIB -u PROJ_DATA -u GDAL_DATA "${GITHUB_WORKSPACE}/dist/geodepot/geodepot" --help
+          rm -rf smoke/relocated
+          mkdir -p smoke/relocated
+          cp -R "${GITHUB_WORKSPACE}/dist/geodepot" "${GITHUB_WORKSPACE}/smoke/relocated/geodepot"
+          env -u CONDA_PREFIX -u CONDA_DEFAULT_ENV -u PYTHONPATH -u PROJ_LIB -u PROJ_DATA -u GDAL_DATA "${GITHUB_WORKSPACE}/smoke/relocated/geodepot/geodepot" --help
           rm -rf smoke/repo
           mkdir -p smoke/repo
           cd smoke/repo
-          env -u CONDA_PREFIX -u CONDA_DEFAULT_ENV -u PYTHONPATH -u PROJ_LIB -u PROJ_DATA -u GDAL_DATA "${GITHUB_WORKSPACE}/dist/geodepot/geodepot" init
-          env -u CONDA_PREFIX -u CONDA_DEFAULT_ENV -u PYTHONPATH -u PROJ_LIB -u PROJ_DATA -u GDAL_DATA "${GITHUB_WORKSPACE}/dist/geodepot/geodepot" add wippolder "${GITHUB_WORKSPACE}/tests/data/sources/wippolder/wippolder.gpkg"
+          env -u CONDA_PREFIX -u CONDA_DEFAULT_ENV -u PYTHONPATH -u PROJ_LIB -u PROJ_DATA -u GDAL_DATA "${GITHUB_WORKSPACE}/smoke/relocated/geodepot/geodepot" init
+          env -u CONDA_PREFIX -u CONDA_DEFAULT_ENV -u PYTHONPATH -u PROJ_LIB -u PROJ_DATA -u GDAL_DATA "${GITHUB_WORKSPACE}/smoke/relocated/geodepot/geodepot" add wippolder "${GITHUB_WORKSPACE}/tests/data/sources/wippolder/wippolder.gpkg"
 
       - if: runner.os == 'Windows'
         name: Smoke test bundle Windows
         run: |
+          Remove-Item -Recurse -Force smoke\relocated -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force smoke\relocated | Out-Null
+          Copy-Item -Recurse dist\geodepot smoke\relocated\geodepot
           Remove-Item -Recurse -Force smoke\repo -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force smoke\repo | Out-Null
-          & "$env:GITHUB_WORKSPACE\dist\geodepot\geodepot.cmd" --help
+          & "$env:GITHUB_WORKSPACE\smoke\relocated\geodepot\geodepot.cmd" --help
           Push-Location smoke\repo
-          & "$env:GITHUB_WORKSPACE\dist\geodepot\geodepot.cmd" init
-          & "$env:GITHUB_WORKSPACE\dist\geodepot\geodepot.cmd" add wippolder "$env:GITHUB_WORKSPACE\tests\data\sources\wippolder\wippolder.gpkg"
+          & "$env:GITHUB_WORKSPACE\smoke\relocated\geodepot\geodepot.cmd" init
+          & "$env:GITHUB_WORKSPACE\smoke\relocated\geodepot\geodepot.cmd" add wippolder "$env:GITHUB_WORKSPACE\tests\data\sources\wippolder\wippolder.gpkg"
           Pop-Location
 
       - if: runner.os == 'Linux'

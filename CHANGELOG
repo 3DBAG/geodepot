@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [1.0.8] - 2026-04-22
+
+- Fixed the Linux installer tag lookup to avoid the `curl: (23)` broken-pipe failure.
+- Added installer progress output for POSIX and Windows installs.
+- Made `geodepot init` work without requiring the GDAL/OGR runtime at import time.
+- Added a CI audit that rejects bundles with unresolved native dependencies or build-path leakage.
+- Updated the Unix launcher to export the bundled native library path before starting Geodepot.
+
+## [1.0.7] - 2026-04-01
+
 ## [1.0.6] - 2026-04-01
 
 ## [1.0.5] - 2026-04-01
