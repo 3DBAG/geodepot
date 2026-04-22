@@ -15,6 +15,7 @@ WINDOWS_SYSTEM_DLLS = {
     "advapi32.dll",
     "bcrypt.dll",
     "comdlg32.dll",
+    "cabinet.dll",
     "crypt32.dll",
     "d3d11.dll",
     "d3dcompiler_47.dll",
