@@ -75,6 +75,9 @@ python = "3.12.*"
 python-pdal = "3.4.*"
 requests = "2.32.*"
 
+[tool.pixi.target.win-64.dependencies]
+impi_rt = "*"
+
 [tool.pixi.feature.local.dependencies]
 geodepot = { path = "." }
 
