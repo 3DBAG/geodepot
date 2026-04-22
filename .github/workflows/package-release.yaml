@@ -100,7 +100,7 @@ jobs:
           # are not needed and may contain build-path references.
           rm -rf activate* deactivate*
           if [ -d env/bin ]; then
-            find env/bin -maxdepth 1 -type f -exec grep -Il "${GITHUB_WORKSPACE}" {} + | xargs -r rm -f
+            find env/bin -maxdepth 1 \( -type f -o -type l \) -exec grep -Il "${GITHUB_WORKSPACE}" {} + | xargs -r rm -f
           fi
           install -m 755 ../../packaging/pixi/geodepot.sh ./geodepot
 
@@ -115,7 +115,7 @@ jobs:
           # are not needed and may contain build-path references.
           Remove-Item -Recurse -Force activate*, deactivate* -ErrorAction SilentlyContinue
           if (Test-Path env\bin) {
-            Get-ChildItem env\bin -File | Select-String -SimpleMatch $env:GITHUB_WORKSPACE -List | ForEach-Object {
+            Get-ChildItem env\bin -Force | Where-Object { -not $_.PSIsContainer } | Select-String -SimpleMatch $env:GITHUB_WORKSPACE -List | ForEach-Object {
               Remove-Item -Force $_.Path
             }
           }
