@@ -99,9 +99,7 @@ jobs:
           # The wrapper starts Geodepot directly; the generated activation scripts
           # are not needed and may contain build-path references.
           rm -rf activate* deactivate*
-          if [ -d env/bin ]; then
-            python ../../packaging/ci/remove_path_leaking_bin_wrappers.py env/bin "$GITHUB_WORKSPACE"
-          fi
+          python ../../packaging/ci/remove_path_leaking_bin_wrappers.py . "$GITHUB_WORKSPACE"
           install -m 755 ../../packaging/pixi/geodepot.sh ./geodepot
 
       - if: runner.os == 'Windows'
@@ -114,9 +112,7 @@ jobs:
           # The wrapper starts Geodepot directly; the generated activation scripts
           # are not needed and may contain build-path references.
           Remove-Item -Recurse -Force activate*, deactivate* -ErrorAction SilentlyContinue
-          if (Test-Path env\bin) {
-            python ..\..\packaging\ci\remove_path_leaking_bin_wrappers.py env\bin "$env:GITHUB_WORKSPACE"
-          }
+          python ..\..\packaging\ci\remove_path_leaking_bin_wrappers.py . "$env:GITHUB_WORKSPACE"
           Pop-Location
           Copy-Item packaging\pixi\geodepot.cmd dist\geodepot\geodepot.cmd
           Copy-Item packaging\pixi\geodepot.ps1 dist\geodepot\geodepot.ps1
