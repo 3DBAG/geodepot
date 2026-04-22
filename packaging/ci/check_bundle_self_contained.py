@@ -42,6 +42,7 @@ WINDOWS_SYSTEM_DLLS = {
     "version.dll",
     "wsock32.dll",
     "dxgi.dll",
+    "dnsapi.dll",
     "winmm.dll",
     "ws2_32.dll",
 }
