@@ -17,6 +17,7 @@ WINDOWS_SYSTEM_DLLS = {
     "comdlg32.dll",
     "crypt32.dll",
     "d3d11.dll",
+    "d3dcompiler_47.dll",
     "gdi32.dll",
     "kernel32.dll",
     "mscoree.dll",
