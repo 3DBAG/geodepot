@@ -7,7 +7,10 @@ from pathlib import Path
 def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
     if len(args) != 2:
-        print("usage: remove_path_leaking_bin_wrappers.py <bin-dir> <prefix>", file=sys.stderr)
+        print(
+            "usage: remove_path_leaking_bin_wrappers.py <bin-dir> <prefix>",
+            file=sys.stderr,
+        )
         return 2
 
     bin_dir = Path(args[0])
