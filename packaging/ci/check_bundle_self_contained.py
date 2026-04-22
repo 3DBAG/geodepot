@@ -6,7 +6,6 @@ import fnmatch
 import os
 import platform
 import subprocess
-import sys
 from pathlib import Path
 
 
