@@ -11,49 +11,6 @@ from pathlib import Path
 
 LINUX_SYSTEM_PREFIXES = ("/lib/", "/lib64/", "/usr/lib/", "/usr/lib64/")
 MAC_SYSTEM_PREFIXES = ("/System/Library/", "/usr/lib/")
-WINDOWS_SYSTEM_DLLS = {
-    "advapi32.dll",
-    "bcrypt.dll",
-    "bcryptprimitives.dll",
-    "comdlg32.dll",
-    "cabinet.dll",
-    "crypt32.dll",
-    "d3d11.dll",
-    "d3dcompiler_47.dll",
-    "gdi32.dll",
-    "kernel32.dll",
-    "mscoree.dll",
-    "msvcp140.dll",
-    "msvcrt.dll",
-    "msi.dll",
-    "ntdll.dll",
-    "iphlpapi.dll",
-    "odbc32.dll",
-    "odbccp32.dll",
-    "ole32.dll",
-    "oleaut32.dll",
-    "propsys.dll",
-    "rpcrt4.dll",
-    "secur32.dll",
-    "schannel.dll",
-    "shell32.dll",
-    "shlwapi.dll",
-    "cryptnet.dll",
-    "normaliz.dll",
-    "ntmarta.dll",
-    "winhttp.dll",
-    "mpr.dll",
-    "ucrtbase.dll",
-    "user32.dll",
-    "userenv.dll",
-    "version.dll",
-    "wldap32.dll",
-    "wsock32.dll",
-    "dxgi.dll",
-    "dnsapi.dll",
-    "winmm.dll",
-    "ws2_32.dll",
-}
 WINDOWS_SYSTEM_PATTERNS = (
     "api-ms-win-*.dll",
     "ext-ms-*.dll",
@@ -194,6 +151,21 @@ def bundle_library_dirs(bundle_root: Path) -> list[str]:
         bundle_root / "_internal",
     )
     return [str(path) for path in candidates if path.is_dir()]
+
+
+def windows_system_dll_path(dep_name: str) -> Path | None:
+    windows_root = os.environ.get("WINDIR") or os.environ.get("SystemRoot")
+    if not windows_root:
+        return None
+
+    candidates = (
+        Path(windows_root) / "System32" / dep_name,
+        Path(windows_root) / "SysWOW64" / dep_name,
+    )
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
 
 
 def audit_linux(files: list[Path], bundle_root: Path, bundle_names: set[str]) -> None:
@@ -358,7 +330,7 @@ def audit_windows(files: list[Path], bundle_names: set[str]) -> None:
             dep_lower = dep.lower()
             if dep_lower in bundle_names:
                 continue
-            if dep_lower in WINDOWS_SYSTEM_DLLS:
+            if windows_system_dll_path(dep_lower):
                 continue
             if any(
                 fnmatch.fnmatch(dep_lower, pattern)
