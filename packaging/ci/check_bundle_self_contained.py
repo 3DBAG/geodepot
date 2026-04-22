@@ -24,6 +24,7 @@ WINDOWS_SYSTEM_DLLS = {
     "mscoree.dll",
     "msvcp140.dll",
     "msvcrt.dll",
+    "msi.dll",
     "ntdll.dll",
     "ole32.dll",
     "oleaut32.dll",
