@@ -117,6 +117,16 @@ jobs:
           Copy-Item packaging\pixi\geodepot.cmd dist\geodepot\geodepot.cmd
           Copy-Item packaging\pixi\geodepot.ps1 dist\geodepot\geodepot.ps1
 
+      - if: runner.os == 'Windows'
+        name: Prune Windows MPI DLLs
+        run: |
+          # The bundle does not use MKL's MPI-backed BLACS/scaLAPACK helpers.
+          # Keeping them would make the archive depend on an external MPI runtime.
+          Remove-Item -Force `
+            dist\geodepot\env\Library\bin\mkl_blacs_*.dll `
+            dist\geodepot\env\Library\bin\mkl_scalapack_*.dll `
+            -ErrorAction SilentlyContinue
+
       - if: runner.os == 'Linux'
         name: Add installer scripts to dist
         run: |
