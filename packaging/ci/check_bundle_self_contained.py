@@ -16,6 +16,7 @@ WINDOWS_SYSTEM_DLLS = {
     "bcrypt.dll",
     "comdlg32.dll",
     "crypt32.dll",
+    "d3d11.dll",
     "gdi32.dll",
     "kernel32.dll",
     "mscoree.dll",
@@ -30,6 +31,7 @@ WINDOWS_SYSTEM_DLLS = {
     "ucrtbase.dll",
     "user32.dll",
     "version.dll",
+    "dxgi.dll",
     "winmm.dll",
     "ws2_32.dll",
 }
