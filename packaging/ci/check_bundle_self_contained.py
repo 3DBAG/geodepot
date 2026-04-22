@@ -38,6 +38,7 @@ WINDOWS_SYSTEM_DLLS = {
     "shlwapi.dll",
     "ucrtbase.dll",
     "user32.dll",
+    "userenv.dll",
     "version.dll",
     "wsock32.dll",
     "dxgi.dll",
