@@ -13,6 +13,10 @@ $Repo = if ($env:GEODEPOT_REPO) { $env:GEODEPOT_REPO } else { "3DBAG/geodepot" }
 $ApiBase = if ($env:GEODEPOT_GITHUB_API) { $env:GEODEPOT_GITHUB_API } else { "https://api.github.com" }
 $DownloadBase = if ($env:GEODEPOT_GITHUB_DOWNLOAD) { $env:GEODEPOT_GITHUB_DOWNLOAD } else { "https://github.com/$Repo/releases/download" }
 
+function Write-Status([string]$Message) {
+    Write-Host $Message
+}
+
 function Resolve-Tag {
     if ($Version -ne "latest") {
         return $Version
@@ -60,6 +64,16 @@ $Arch = Resolve-Arch
 $Asset = Resolve-AssetName -Tag $Tag -Arch $Arch
 $ChecksumAsset = "$Asset.sha256sum"
 
+Write-Status "Starting Geodepot installation."
+Write-Status "Detecting platform and release bundle."
+if ($Version -eq "latest") {
+    Write-Status "Resolving latest release tag from GitHub."
+} else {
+    Write-Status "Installing requested version: $Version."
+}
+Write-Status "Using release $Tag for windows/$Arch."
+Write-Status "Selected bundle $Asset."
+
 $TempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("geodepot-install-" + [System.Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $TempDir | Out-Null
 
@@ -67,9 +81,11 @@ try {
     $ArchivePath = Join-Path $TempDir $Asset
     $ChecksumPath = Join-Path $TempDir $ChecksumAsset
 
+    Write-Status "Downloading bundle and checksum."
     Invoke-WebRequest -Uri "$DownloadBase/$Tag/$Asset" -OutFile $ArchivePath
     Invoke-WebRequest -Uri "$DownloadBase/$Tag/$ChecksumAsset" -OutFile $ChecksumPath
 
+    Write-Status "Verifying checksum."
     $ExpectedHash = ((Get-Content -Path $ChecksumPath -Raw).Trim() -split '\s+')[0].ToLowerInvariant()
     $ActualHash = (Get-FileHash -Path $ArchivePath -Algorithm SHA256).Hash.ToLowerInvariant()
 
@@ -83,6 +99,8 @@ try {
     }
 
     New-Item -ItemType Directory -Force -Path $ReleaseDir | Out-Null
+    Write-Status "Installing into $ReleaseDir."
+    Write-Status "Extracting bundle."
     Expand-Archive -Path $ArchivePath -DestinationPath $ReleaseDir -Force
 
     $BundleDir = Join-Path $ReleaseDir "geodepot"
@@ -94,6 +112,7 @@ try {
     }
 
     if (-not $NoWrapper) {
+        Write-Status "Installing wrappers in $BinDir."
         New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
 
         $CmdWrapperPath = Join-Path $BinDir "geodepot.cmd"
