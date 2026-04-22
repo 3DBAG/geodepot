@@ -28,6 +28,8 @@ WINDOWS_SYSTEM_DLLS = {
     "msi.dll",
     "ntdll.dll",
     "iphlpapi.dll",
+    "odbc32.dll",
+    "odbccp32.dll",
     "ole32.dll",
     "oleaut32.dll",
     "propsys.dll",
