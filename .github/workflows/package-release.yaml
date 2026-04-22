@@ -119,6 +119,9 @@ jobs:
       - name: Add license documentation to bundle
         run: cp THIRD_PARTY_LICENSES.md dist/geodepot/THIRD_PARTY_LICENSES.md
 
+      - name: Audit bundle dependencies
+        run: python packaging/ci/check_bundle_self_contained.py dist/geodepot
+
       - if: runner.os != 'Windows'
         name: Smoke test bundle non-Windows
         run: |
