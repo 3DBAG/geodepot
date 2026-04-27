@@ -152,11 +152,11 @@ For development, use `pixi` to create the environment and run the project tools.
 ### Configure your user
 
 The user information helps to identify changes and locks when working with a remote repository.
-It consists of a name and an e-mail address and it is stored in the local HOME directory of the user.
+It consists of a name and an e-mail address, and it is stored in the project repository.
 
 ```shell
-geodepot config --global user.name "My Name"
-geodepot config --global user.email "my@email.me"
+geodepot config set user.name "My Name"
+geodepot config set user.email "my@email.me"
 ```
 
 ## Initialize a repository
