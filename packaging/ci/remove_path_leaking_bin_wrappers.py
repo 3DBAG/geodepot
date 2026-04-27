@@ -43,17 +43,19 @@ def main(argv: list[str] | None = None) -> int:
     for path in bundle_root.rglob("*"):
         if not path.is_file() or path.is_symlink():
             continue
+
+        # ONLY check files we know are text or match our allowlist
+        # Do NOT unlink .so, .pyd, or .dll files!
         name = path.name.lower()
-        if name not in TEXT_BASENAMES and path.suffix.lower() not in TEXT_SUFFIXES:
-            try:
-                with path.open("rb") as handle:
-                    if b"\0" in handle.read(4096):
-                        continue
-            except OSError:
-                continue
+        is_text = name in TEXT_BASENAMES or path.suffix.lower() in TEXT_SUFFIXES
+
+        if not is_text:
+            continue  # Skip binary auditing to avoid deleting shared libs
+
         try:
             if prefix in path.read_bytes():
                 path.unlink()
+                print(f"Removed path-leaking wrapper: {path}")
         except OSError:
             continue
 
