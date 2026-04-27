@@ -231,7 +231,8 @@ class Index:
         if isinstance(path, Path):
             if not path.exists():
                 raise GeodepotIndexError(f"Index path {path} does not exist")
-        from osgeo.ogr import GetDriverByName
+        from osgeo.ogr import GetDriverByName, UseExceptions
+        UseExceptions()
 
         cases_in_index = {}
         try:

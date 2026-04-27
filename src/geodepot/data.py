@@ -41,7 +41,8 @@ class BBox:
 
     def to_ogr_geometry_wkbpolygon(self):
         """Convert to an OGR Geometry that is a wkbPolygon."""
-        from osgeo.ogr import Geometry, wkbPolygon, wkbLinearRing
+        from osgeo.ogr import Geometry, wkbPolygon, wkbLinearRing, UseExceptions
+        UseExceptions()
 
         ring = Geometry(wkbLinearRing)
         ring.AddPoint_2D(self.minx, self.miny)
@@ -233,6 +234,8 @@ class Data:
                 return bbox_srs
         elif self.driver == Drivers.OGR:
             from osgeo.ogr import Open as ogrOpen
+            from osgeo.ogr import UseExceptions
+            UseExceptions()
 
             with ogrOpen(path) as ogr_dataset:
                 lyr = ogr_dataset.GetLayer(0)
@@ -294,7 +297,8 @@ class Data:
 
     @classmethod
     def from_ogr_feature(cls, feature) -> Self:
-        from osgeo.ogr import CreateGeometryFromWkt
+        from osgeo.ogr import CreateGeometryFromWkt, UseExceptions
+        UseExceptions()
 
         df = cls.__new__(cls)
         df.name = DataName(feature["data_name"])
@@ -366,6 +370,8 @@ def try_pdal(path: Path) -> str | None:
 
 def try_ogr(path: Path) -> str | None:
     from osgeo.ogr import Open as ogrOpen
+    from osgeo.ogr import UseExceptions
+    UseExceptions()
 
     try:
         with ogrOpen(path) as ogr_dataset:
