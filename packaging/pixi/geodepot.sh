@@ -10,6 +10,10 @@ ACTIVATE_DIR="${CONDA_PREFIX}/etc/conda/activate.d"
 
 export CONDA_PREFIX
 export CONDA_SHLVL=1
+# Explicitly set paths for geospatial data
+export GDAL_DATA="${CONDA_PREFIX}/share/gdal"
+export PROJ_LIB="${CONDA_PREFIX}/share/proj"
+# Add conda to path
 export PATH="${CONDA_PREFIX}/bin:${PATH}"
 
 case "$(uname -s)" in
@@ -18,7 +22,7 @@ case "$(uname -s)" in
         export DYLD_FALLBACK_LIBRARY_PATH="${CONDA_PREFIX}/lib${DYLD_FALLBACK_LIBRARY_PATH:+:${DYLD_FALLBACK_LIBRARY_PATH}}"
         ;;
     *)
-        export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+        export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib:${CONDA_PREFIX}/lib64:${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
         ;;
 esac
 
