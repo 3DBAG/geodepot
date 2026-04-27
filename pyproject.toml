@@ -89,7 +89,8 @@ version = "1.0.8"
 backend = { name = "pixi-build-python", version = "*", channels = ["https://prefix.dev/pixi-build-backends", "conda-forge"] }
 
 [tool.pixi.package.build.config]
-ignore-pypi-mapping = true
+# Allow Pixi to map PyPI dependencies to Conda packages automatically
+ignore-pypi-mapping = false
 
 [tool.pixi.package.build-dependencies]
 python = "3.12.*"
@@ -98,6 +99,8 @@ python = "3.12.*"
 hatchling = "*"
 
 [tool.pixi.package.run-dependencies]
+# On conda-forge, the python bindings are in the 'gdal' package,
+# but 'python-pdal' is the standard name for PDAL bindings
 click = "8.1.*"
 fabric = "3.2.*"
 gdal = "3.9.*"
@@ -106,10 +109,11 @@ python-pdal = "3.4.*"
 requests = "2.32.*"
 
 [tool.pixi.environments]
-default = { solve-group = "runtime" }
+default = { features = ["local"], solve-group = "runtime" }
 dev = { features = ["local", "dev"], solve-group = "dev" }
 
 [tool.pixi.tasks]
+geodepot = "geodepot"
 lint = "ruff check"
 format = "ruff format"
 format-check = "ruff format --check"
