@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Made `geodepot get` print only the resolved case path on stdout, so it can be used directly in scripts.
+- Improved packaging/runtime handling by bundling GDAL and PROJ data correctly and keeping compiled executables intact.
+- Fixed the first-time Pixi configuration setup and clarified the related user-facing docs.
+
 ## [1.0.8] - 2026-04-22
 
 - Fixed the Linux installer tag lookup to avoid the `curl: (23)` broken-pipe failure.
