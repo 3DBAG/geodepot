@@ -75,7 +75,7 @@ Releases are fully automated through three GitHub Actions workflows that chain t
 ```text
 workflow_dispatch (on develop)
   └─ release-prepare.yaml
-       ├─ bumps version in pyproject.toml
+       ├─ bumps version in pyproject.toml and flake.nix
        ├─ updates CHANGELOG with version and date
        ├─ regenerates pixi.lock
        ├─ commits and pushes to develop
@@ -136,7 +136,8 @@ push = false   # pushing is handled by the workflow
 ```
 
 The version string appears in two places in `pyproject.toml` (`[project]` and
-`[tool.pixi.package]`), and bumpver updates both automatically.
+`[tool.pixi.package]`) plus once in `flake.nix`, and bumpver updates all three
+automatically.
 
 !!! warning "pixi.lock must stay in sync"
 

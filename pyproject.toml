@@ -61,6 +61,9 @@ push = false
 "pyproject.toml" = [
     'version = "{version}"',
 ]
+"flake.nix" = [
+    'version = "{version}"; # geodepot version',
+]
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]

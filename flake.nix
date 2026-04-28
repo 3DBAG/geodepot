@@ -68,7 +68,7 @@
 
           geodepot = pyPkgs.buildPythonApplication rec {
             pname = "geodepot";
-            version = "1.0.8";
+            version = "1.0.8"; # geodepot version
             pyproject = true;
             src = ./.;
 
