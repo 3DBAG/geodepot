@@ -133,6 +133,14 @@ def _format_sync_error(
     )
 
 
+def _ssh_connection(remote: Remote):
+    from fabric import Connection
+
+    if remote.ssh_port is None:
+        return Connection(remote.ssh_host)
+    return Connection(remote.ssh_host, port=remote.ssh_port)
+
+
 # to update index: https://pcjericks.github.io/py-gdalogr-cookbook/vector_layers.html#load-data-to-memory
 @dataclass(repr=True, order=True)
 class Index:
@@ -752,9 +760,7 @@ class Repository:
             # If the URL is ssh, then the remote_index_url is the file path on the remote server
             if remote.is_ssh:
                 # GDAL cannot handle ssh/sftp
-                from fabric import Connection
-
-                ssh_conn = Connection(remote.ssh_host)
+                ssh_conn = _ssh_connection(remote)
                 remote_index_locally = self.path / f"remote_{GEODEPOT_INDEX}"
                 try:
                     result = ssh_conn.get(
@@ -799,8 +805,6 @@ class Repository:
                 f"The remote '{remote}' must use an ssh/sftp protocol in order to pull changes."
             )
 
-        from fabric import Connection
-
         # See comments in 'push'. Here we do the opposite, because we overwrite the
         # local with the remote.
         data_to_download = set(
@@ -812,7 +816,7 @@ class Repository:
             i.casespec_self for i in diff_all if i.status == Status.DELETE
         )
 
-        conn_ssh = Connection(remote.ssh_host)
+        conn_ssh = _ssh_connection(remote)
         errors: list[tuple[str, Exception]] = []
         logger.debug(
             "Pull plan for %s: download=%d delete=%d",
@@ -822,9 +826,17 @@ class Repository:
         )
 
         for data in data_to_download:
-            casespec_archive = str(data) + ARCHIVE_EXTENSION
-            archive_path_remote = "/".join([remote.path_cases, casespec_archive])
-            local_case_archive = self.path_cases / casespec_archive
+            if data.is_case:
+                archive_name = f"{data.case_name}{ARCHIVE_EXTENSION}"
+                archive_parent = data.case_name
+            else:
+                archive_name = f"{data.data_name}{ARCHIVE_EXTENSION}"
+                archive_parent = data.case_name
+            archive_path_remote = "/".join(
+                [remote.path_cases, archive_parent, archive_name]
+            )
+            local_case_archive = self.path_cases / archive_parent / archive_name
+            local_case_archive.parent.mkdir(parents=True, exist_ok=True)
             logger.debug(
                 "Downloading %s from %s to %s",
                 data,
@@ -835,6 +847,7 @@ class Repository:
                 _ = conn_ssh.get(
                     local=str(local_case_archive), remote=archive_path_remote
                 )
+                self._decompress_data(local_case_archive, data)
             except Exception as e:
                 error_detail = _format_sync_error(
                     "download", data, archive_path_remote, str(local_case_archive), e
@@ -895,8 +908,6 @@ class Repository:
                 f"The remote '{remote}' must use an ssh/sftp protocol in order to push changes."
             )
 
-        from fabric import Connection
-
         # i.status == Status.DELETE, because if the remote does not contain a data, it
         # shows as it deleted it
         data_to_upload = set(
@@ -912,7 +923,7 @@ class Repository:
             i.casespec_other for i in diff_all if i.status == Status.ADD
         )
 
-        conn_ssh = Connection(remote.ssh_host)
+        conn_ssh = _ssh_connection(remote)
         errors: list[tuple[str, Exception]] = []
         logger.debug(
             "Push plan for %s: upload=%d delete=%d",

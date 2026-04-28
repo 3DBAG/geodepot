@@ -69,7 +69,8 @@ Use `just` as the local entry point. The recipes below all delegate to `pixi` so
 - `just lint`
 - `just format`
 - `just format-check`
-- `just test`
+- `just test` (unit suite, excludes Docker-backed integration tests)
+- `just integration-test` (starts Docker, runs integration tests, stops Docker)
 - `just docs-build`
 - `just docs-deploy`
 - `just download-data`

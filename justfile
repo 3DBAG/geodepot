@@ -17,6 +17,10 @@ format-check:
 test:
     pixi run -e dev test
 
+integration-test:
+    just up
+    trap 'just down' EXIT; pixi run -e dev integration-test
+
 docs-build:
     pixi run -e dev docs-build
 

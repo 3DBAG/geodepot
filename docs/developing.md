@@ -23,7 +23,8 @@ All development tasks are run through `just`:
 just lint          # Lint code with ruff
 just format        # Auto-format code with ruff
 just format-check  # Check formatting without modifying
-just test          # Run all tests with pytest
+just test          # Run unit tests with pytest
+just integration-test  # Run Docker-backed integration tests
 just docs-build    # Build mkdocs locally
 just docs-deploy   # Deploy docs to GitHub Pages
 ```
@@ -48,12 +49,11 @@ This populates `tests/data/` with spatial datasets used by the test suite.
 
 ## Integration Tests
 
-Integration tests (`test_repository_collaboration.py`) use a Docker-based test server
-that provides HTTP and SSH endpoints:
+Integration tests use a Docker-based test server that provides HTTP and SSH endpoints.
+The default unit suite excludes these tests; run them explicitly with:
 
 ```shell
-just up    # Start nginx + sshd containers
-just down  # Stop containers
+just integration-test
 ```
 
 The test server exposes:

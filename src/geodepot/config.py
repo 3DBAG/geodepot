@@ -66,25 +66,30 @@ class Remote:
         self.path = None
         #: The SSH user@host if the protocol is SSH/SFTP
         self.ssh_host = None
+        #: The SSH port if the protocol is SSH/SFTP and the URL includes one
+        self.ssh_port = None
 
         ssh_parts = None
         if self.url.startswith("ssh://"):
-            ssh_parts = self.url.removeprefix("ssh://").split(":")
+            ssh_parts = self.url.removeprefix("ssh://")
         elif self.url.startswith("sftp://"):
-            ssh_parts = self.url.removeprefix("sftp://").split(":")
+            ssh_parts = self.url.removeprefix("sftp://")
         if ssh_parts is not None:
-            if len(ssh_parts) == 2:
-                self.ssh_host = ssh_parts[0]
-                self.path = ssh_parts[1]
-            elif len(ssh_parts) == 1:
-                self.ssh_host = ssh_parts[0]
-                logger.error(
-                    f"Expected a remote URL in the form of ssh[sftp]://<url>:<path>, but did not find :<path> in {self.url}."
-                )
-            else:
-                raise GeodepotInvalidConfiguration(
-                    f"Expected a remote URL in the form of ssh[sftp]://<url>:<path>, but found {self.url}."
-                )
+            ssh_host = ssh_parts
+            if ":" in ssh_parts:
+                maybe_host, maybe_path = ssh_parts.rsplit(":", 1)
+                if maybe_path.startswith("/"):
+                    ssh_host = maybe_host
+                    self.path = maybe_path
+                elif not maybe_path.isdigit():
+                    ssh_host = maybe_host
+                    self.path = maybe_path
+            if ":" in ssh_host:
+                maybe_host, maybe_port = ssh_host.rsplit(":", 1)
+                if maybe_port.isdigit():
+                    ssh_host = maybe_host
+                    self.ssh_port = int(maybe_port)
+            self.ssh_host = ssh_host
             self.is_ssh = True
             if self.ssh_host is None:
                 raise ValueError(f"Could not set Remote ssh_host from {self.url}")

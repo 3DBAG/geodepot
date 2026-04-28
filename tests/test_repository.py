@@ -247,3 +247,32 @@ def test_pull_reports_failed_download_context(repo, monkeypatch):
     assert "download wippolder/wippolder.gpkg" in message
     assert "/srv/geodepot/cases/wippolder/wippolder.gpkg.tar" in message
     assert "RuntimeError: sftp stat failed" in message
+
+
+def test_pull_reports_failed_download_context_for_case(repo, monkeypatch):
+    """pull() should use the case directory for case archives."""
+    repo.config.add_remote("ssh", "ssh://example.com:/srv/geodepot")
+    diff_all = [
+        IndexDiff(
+            status=Status.ADD,
+            casespec_other=CaseSpec("ams-up-large"),
+        )
+    ]
+
+    class FakeConnection:
+        def __init__(self, host):
+            self.host = host
+
+        def get(self, local, remote):
+            raise RuntimeError("sftp stat failed")
+
+    monkeypatch.setattr("fabric.Connection", FakeConnection)
+
+    with pytest.raises(GeodepotSyncError) as excinfo:
+        repo.pull(RemoteName("ssh"), diff_all)
+
+    message = str(excinfo.value)
+    assert "download ams-up-large" in message
+    assert "/srv/geodepot/cases/ams-up-large/ams-up-large.tar" in message
+    assert str(repo.path_cases / "ams-up-large" / "ams-up-large.tar") in message
+    assert "RuntimeError: sftp stat failed" in message
