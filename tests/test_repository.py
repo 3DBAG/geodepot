@@ -3,11 +3,12 @@ from pathlib import Path
 
 import pytest
 
-from geodepot.repository import Repository, Index
+from geodepot.repository import Repository, Index, IndexDiff, Status
 from geodepot.case import CaseSpec, CaseName
 from geodepot.data import DataName
 from geodepot.config import RemoteName
 from geodepot.errors import GeodepotIndexError, GeodepotRuntimeError
+from geodepot.errors import GeodepotSyncError
 
 
 @pytest.fixture(scope="function")
@@ -218,3 +219,31 @@ def test_remove_missing_archive_ok(repo, wippolder_dir):
     (repo.path_cases / "wippolder" / "wippolder.gpkg.tar").unlink()
     repo.remove(CaseSpec("wippolder", "wippolder.gpkg"))  # must not raise
     assert repo.get_data(CaseSpec("wippolder", "wippolder.gpkg")) is None
+
+
+def test_pull_reports_failed_download_context(repo, monkeypatch):
+    """pull() should report which archive and operation failed."""
+    repo.config.add_remote("ssh", "ssh://example.com:/srv/geodepot")
+    diff_all = [
+        IndexDiff(
+            status=Status.ADD,
+            casespec_other=CaseSpec("wippolder", "wippolder.gpkg"),
+        )
+    ]
+
+    class FakeConnection:
+        def __init__(self, host):
+            self.host = host
+
+        def get(self, local, remote):
+            raise RuntimeError("sftp stat failed")
+
+    monkeypatch.setattr("fabric.Connection", FakeConnection)
+
+    with pytest.raises(GeodepotSyncError) as excinfo:
+        repo.pull(RemoteName("ssh"), diff_all)
+
+    message = str(excinfo.value)
+    assert "download wippolder/wippolder.gpkg" in message
+    assert "/srv/geodepot/cases/wippolder/wippolder.gpkg.tar" in message
+    assert "RuntimeError: sftp stat failed" in message

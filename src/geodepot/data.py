@@ -92,6 +92,12 @@ class Data:
         changed_by: User = None,
         data_name: str | DataName = None,
     ):
+        logger.debug(
+            "Initializing data item from %s: data_name=%s format=%s",
+            path,
+            data_name,
+            data_format,
+        )
         self.name = (
             DataName(data_name) if data_name is not None else DataName(path.name)
         )
@@ -103,14 +109,17 @@ class Data:
         self.driver = None
         self.bbox = None
         if path.is_file():
+            logger.debug("Computing sha1 for %s", path)
             self.sha1 = self._compute_sha1(path)
             if data_format is None:
+                logger.debug("Inferring format for %s", path)
                 self.driver, self.format = self._infer_format(path)
                 if self.driver is None:
                     logger.error(
                         f"Could not determine the driver for the format {self.format} of {path}"
                     )
                 else:
+                    logger.debug("Computing bbox for %s using driver %s", path, self.driver)
                     self.bbox = self._compute_bbox(path)
             else:
                 logger.info(
@@ -119,28 +128,38 @@ class Data:
 
     @staticmethod
     def _compute_sha1(path: Path) -> str:
+        logger.debug("Reading bytes for sha1 digest: %s", path)
         with path.open("rb") as f:
-            return file_digest(f, "sha1").hexdigest()
+            digest = file_digest(f, "sha1").hexdigest()
+        logger.debug("Computed sha1 for %s", path)
+        return digest
 
     @staticmethod
     def _infer_format(path: Path) -> tuple[Drivers, str]:
         """Try opening the file with different readers to determine its format."""
         if is_cityjson(path.suffixes):
+            logger.debug("Inferred CityJSON from suffixes for %s", path)
             return Drivers.CITYJSON, "cityjson"
         elif is_cityjson_seq(path.suffixes):
+            logger.debug("Inferred CityJSON sequence from suffixes for %s", path)
             return Drivers.CITYJSON, "cityjsonseq"
         if (ogr_format := try_ogr(path)) is not None:
+            logger.debug("Inferred OGR format %s for %s", ogr_format, path)
             return Drivers.OGR, ogr_format
         if (gdal_format := try_gdal(path)) is not None:
+            logger.debug("Inferred GDAL format %s for %s", gdal_format, path)
             return Drivers.GDAL, gdal_format
         if (pdal_format := try_pdal(path)) is not None:
+            logger.debug("Inferred PDAL format %s for %s", pdal_format, path)
             return Drivers.PDAL, pdal_format
+        logger.debug("Could not infer format for %s", path)
         raise GeodepotDataError(f"Cannot determine format of {path}")
 
     def _compute_bbox(self, path: Path) -> BBoxSRS:
         from osgeo.osr import SpatialReference, CreateCoordinateTransformation
 
         target_epsg = GEODEPOT_INDEX_EPSG
+        logger.debug("Computing bbox for %s with driver %s", path, self.driver)
         pseudo_mercator = SpatialReference()
         pseudo_mercator.ImportFromEPSG(target_epsg)
         if self.driver == Drivers.CITYJSON:
@@ -169,6 +188,7 @@ class Data:
                         elif real_y > maxy:
                             maxy = real_y
                     bbox_srs = BBoxSRS(bbox_original_srs=BBox(minx, maxx, miny, maxy))
+                    logger.debug("Computed CityJSON bbox for %s", path)
                     if srs is not None:
                         # EPSG parsing taken from https://github.com/cityjson/cjio
                         if "opengis.net/def/crs" not in srs or srs.rfind("/") < 0:
@@ -190,6 +210,7 @@ class Data:
                                 )
                     return bbox_srs
                 else:
+                    logger.debug("CityJSON file missing vertices: %s", path)
                     raise GeodepotDataError(
                         f"Cannot compute bounding box for {path}, file does not contain a 'vertices' member"
                     )
@@ -211,6 +232,7 @@ class Data:
                     bbox_srs.bbox_original_srs = BBox(
                         extent[0], extent[1], extent[2], extent[3]
                     )
+                    logger.debug("Computed GDAL extent for %s", path)
                 else:
                     logger.info(
                         f"Could not find the affine transformation parameters of {path} and could not calculate its extent."
@@ -246,6 +268,7 @@ class Data:
                 bbox_srs = BBoxSRS(
                     bbox_original_srs=BBox(extent[0], extent[2], extent[1], extent[3])
                 )
+                logger.debug("Computed OGR extent for %s", path)
                 if srs is not None:
                     bbox_srs.srs_wkt = srs.ExportToWkt()
                     try:
@@ -268,6 +291,7 @@ class Data:
             from pdal import Pipeline
 
             pdal_pipeline = Pipeline(dumps([str(path), pdal_filter_stats]))
+            logger.debug("Executing PDAL stats pipeline for %s", path)
             pdal_pipeline.execute()
             stats = pdal_pipeline.metadata["metadata"]["filters.stats"]["statistic"]
             bbox = (
@@ -304,6 +328,7 @@ class Data:
         UseExceptions()
 
         df = cls.__new__(cls)
+        logger.debug("Deserializing data feature: %s", feature["data_name"])
         df.name = DataName(feature["data_name"])
         df.sha1 = feature["data_sha1"]
         df.description = feature["data_description"]
