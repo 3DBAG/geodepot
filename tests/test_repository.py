@@ -4,8 +4,8 @@ from pathlib import Path
 import pytest
 
 from geodepot.repository import Repository, Index, IndexDiff, Status
-from geodepot.case import CaseSpec, CaseName
-from geodepot.data import DataName
+from geodepot.case import Case, CaseSpec, CaseName
+from geodepot.data import Data, DataName
 from geodepot.config import RemoteName
 from geodepot.errors import GeodepotIndexError, GeodepotRuntimeError
 from geodepot.errors import GeodepotSyncError
@@ -276,3 +276,59 @@ def test_pull_reports_failed_download_context_for_case(repo, monkeypatch):
     assert "/srv/geodepot/cases/ams-up-large/ams-up-large.tar" in message
     assert str(repo.path_cases / "ams-up-large" / "ams-up-large.tar") in message
     assert "RuntimeError: sftp stat failed" in message
+
+
+def test_pull_falls_back_to_data_archives_for_missing_case_archive(repo, monkeypatch):
+    """pull() should handle remotes that have per-data archives but no case archive."""
+    repo.config.add_remote("ssh", "ssh://example.com:/srv/geodepot")
+    remote_case = Case(name=CaseName("bvz-dh-coast-5"), description=None)
+    remote_case.add_data(
+        Data(Path("bvz_dh"), data_name=DataName("bvz_dh"), data_format="directory")
+    )
+    remote_case.add_data(
+        Data(
+            Path("profile-tyler.json"),
+            data_name=DataName("profile-tyler.json"),
+            data_format="JSON",
+        )
+    )
+    repo.index_remote = Index(cases={remote_case.name: remote_case})
+    diff_all = [
+        IndexDiff(
+            status=Status.ADD,
+            casespec_other=CaseSpec(remote_case.name),
+        )
+    ]
+    downloaded: list[str] = []
+    decompressed: list[CaseSpec] = []
+
+    class FakeConnection:
+        def __init__(self, host):
+            self.host = host
+
+        def get(self, local, remote):
+            downloaded.append(remote)
+            if remote.endswith("/bvz-dh-coast-5/bvz-dh-coast-5.tar"):
+                raise FileNotFoundError(2, "No such file")
+            Path(local).parent.mkdir(parents=True, exist_ok=True)
+            Path(local).touch()
+
+    monkeypatch.setattr("fabric.Connection", FakeConnection)
+    monkeypatch.setattr(
+        repo,
+        "_decompress_data",
+        lambda _archive, casespec: decompressed.append(casespec) or True,
+    )
+
+    repo.pull(RemoteName("ssh"), diff_all)
+
+    assert downloaded == [
+        "/srv/geodepot/cases/bvz-dh-coast-5/bvz-dh-coast-5.tar",
+        "/srv/geodepot/cases/bvz-dh-coast-5/bvz_dh.tar",
+        "/srv/geodepot/cases/bvz-dh-coast-5/profile-tyler.json.tar",
+        "/srv/geodepot/index.geojson",
+    ]
+    assert decompressed == [
+        CaseSpec(remote_case.name, DataName("bvz_dh")),
+        CaseSpec(remote_case.name, DataName("profile-tyler.json")),
+    ]

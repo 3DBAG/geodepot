@@ -825,7 +825,7 @@ class Repository:
             len(data_to_delete),
         )
 
-        for data in data_to_download:
+        def download_archive(data: CaseSpec) -> None:
             if data.is_case:
                 archive_name = f"{data.case_name}{ARCHIVE_EXTENSION}"
                 archive_parent = data.case_name
@@ -835,22 +835,98 @@ class Repository:
             archive_path_remote = "/".join(
                 [remote.path_cases, archive_parent, archive_name]
             )
-            local_case_archive = self.path_cases / archive_parent / archive_name
-            local_case_archive.parent.mkdir(parents=True, exist_ok=True)
+            local_archive = self.path_cases / archive_parent / archive_name
+            local_archive.parent.mkdir(parents=True, exist_ok=True)
             logger.debug(
                 "Downloading %s from %s to %s",
                 data,
                 archive_path_remote,
-                local_case_archive,
+                local_archive,
             )
+            _ = conn_ssh.get(local=str(local_archive), remote=archive_path_remote)
+            self._decompress_data(local_archive, data)
+
+        def remote_data_specs(case_spec: CaseSpec) -> list[CaseSpec]:
+            if self.index_remote is None:
+                return []
+            remote_case = self.index_remote.cases.get(case_spec.case_name)
+            if remote_case is None:
+                return []
+            return [
+                CaseSpec(case_name=remote_case.name, data_name=data_name)
+                for data_name in remote_case.data
+            ]
+
+        for data in data_to_download:
             try:
-                _ = conn_ssh.get(
-                    local=str(local_case_archive), remote=archive_path_remote
+                download_archive(data)
+            except FileNotFoundError as e:
+                if not data.is_case:
+                    archive_name = f"{data.data_name}{ARCHIVE_EXTENSION}"
+                    archive_parent = data.case_name
+                    archive_path_remote = "/".join(
+                        [remote.path_cases, archive_parent, archive_name]
+                    )
+                    local_archive = self.path_cases / archive_parent / archive_name
+                    error_detail = _format_sync_error(
+                        "download", data, archive_path_remote, str(local_archive), e
+                    )
+                    logger.error(error_detail, exc_info=True)
+                    errors.append((error_detail, e))
+                    continue
+
+                data_specs = remote_data_specs(data)
+                if len(data_specs) == 0:
+                    archive_name = f"{data.case_name}{ARCHIVE_EXTENSION}"
+                    archive_path_remote = "/".join(
+                        [remote.path_cases, data.case_name, archive_name]
+                    )
+                    local_archive = self.path_cases / data.case_name / archive_name
+                    error_detail = _format_sync_error(
+                        "download", data, archive_path_remote, str(local_archive), e
+                    )
+                    logger.error(error_detail, exc_info=True)
+                    errors.append((error_detail, e))
+                    continue
+
+                logger.debug(
+                    "Case archive for %s was not found; downloading %d data archive(s)",
+                    data,
+                    len(data_specs),
                 )
-                self._decompress_data(local_case_archive, data)
+                for data_spec in data_specs:
+                    try:
+                        download_archive(data_spec)
+                    except Exception as data_error:
+                        archive_name = f"{data_spec.data_name}{ARCHIVE_EXTENSION}"
+                        archive_path_remote = "/".join(
+                            [remote.path_cases, data_spec.case_name, archive_name]
+                        )
+                        local_archive = (
+                            self.path_cases / data_spec.case_name / archive_name
+                        )
+                        error_detail = _format_sync_error(
+                            "download",
+                            data_spec,
+                            archive_path_remote,
+                            str(local_archive),
+                            data_error,
+                        )
+                        logger.error(error_detail, exc_info=True)
+                        errors.append((error_detail, data_error))
             except Exception as e:
+                if data.is_case:
+                    archive_name = f"{data.case_name}{ARCHIVE_EXTENSION}"
+                    archive_parent = data.case_name
+                else:
+                    archive_name = f"{data.data_name}{ARCHIVE_EXTENSION}"
+                    archive_parent = data.case_name
+                archive_path_remote = "/".join(
+                    [remote.path_cases, archive_parent, archive_name]
+                )
+                local_archive = self.path_cases / archive_parent / archive_name
                 error_detail = _format_sync_error(
-                    "download", data, archive_path_remote, str(local_case_archive), e
+                    "download", data, archive_path_remote, str(local_archive), e
                 )
                 logger.error(error_detail, exc_info=True)
                 errors.append((error_detail, e))
