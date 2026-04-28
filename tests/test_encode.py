@@ -1,3 +1,4 @@
+import logging
 import json
 
 from geodepot.config import Config, User, config_encoder, Remote, JSON_INDENT
@@ -65,3 +66,20 @@ def test_encode_with_multiple_members():
         },
     }
     assert json.loads(json_str) == expected
+
+
+def test_encode_logs_dataclass_boundaries(caplog):
+    config = Config(user=User(name="<NAME>", email="<EMAIL>"))
+
+    with caplog.at_level(logging.DEBUG, logger="geodepot.encode"):
+        json.dumps(config, cls=DataClassEncoder)
+
+    messages = [
+        record.message
+        for record in caplog.records
+        if record.name == "geodepot.encode" and record.levelno == logging.DEBUG
+    ]
+    assert any(
+        "Encoding dataclass Config with 1 populated field(s)" in message
+        for message in messages
+    )

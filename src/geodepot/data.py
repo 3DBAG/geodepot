@@ -119,7 +119,9 @@ class Data:
                         f"Could not determine the driver for the format {self.format} of {path}"
                     )
                 else:
-                    logger.debug("Computing bbox for %s using driver %s", path, self.driver)
+                    logger.debug(
+                        "Computing bbox for %s using driver %s", path, self.driver
+                    )
                     self.bbox = self._compute_bbox(path)
             else:
                 logger.info(

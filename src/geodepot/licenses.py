@@ -1,7 +1,10 @@
 """License information for Geodepot and its bundled dependencies."""
 
+from logging import getLogger
+
 from click import echo
 
+logger = getLogger(__name__)
 
 LICENSES = """# Third-Party Licenses
 
@@ -155,5 +158,6 @@ For complete license information, see THIRD_PARTY_LICENSES.md in the repository.
 def print_licenses(ctx, param, value):
     """Callback to print licenses and exit."""
     if value:
+        logger.debug("Printing bundled license information")
         echo(LICENSES)
         ctx.exit()

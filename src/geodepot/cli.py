@@ -2,7 +2,15 @@ import logging
 from logging import DEBUG, INFO, Formatter, StreamHandler, getLogger
 import sys
 
-from click import Context, argument, command, group, option, pass_context, version_option
+from click import (
+    Context,
+    argument,
+    command,
+    group,
+    option,
+    pass_context,
+    version_option,
+)
 
 from geodepot.case import CaseSpec
 from geodepot.config import (

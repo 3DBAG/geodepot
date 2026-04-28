@@ -1,5 +1,8 @@
 from dataclasses import is_dataclass, asdict
 from json import JSONEncoder
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 
 class DataClassEncoder(JSONEncoder):
@@ -12,6 +15,13 @@ class DataClassEncoder(JSONEncoder):
 
     def default(self, o):
         if is_dataclass(o):
-            return {k: v for k, v in asdict(o).items() if v is not None}
+            payload = {k: v for k, v in asdict(o).items() if v is not None}
+            logger.debug(
+                "Encoding dataclass %s with %d populated field(s)",
+                type(o).__name__,
+                len(payload),
+            )
+            return payload
         else:
+            logger.debug("Delegating JSON encoding for %s", type(o).__name__)
             return super().default(o)

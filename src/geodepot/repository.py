@@ -580,7 +580,9 @@ class Repository:
         else:
             # Add/Update the specified data to the case
             data_paths = parse_pathspec(pathspec, as_data=as_data)
-            logger.debug("Resolved pathspec %s to %d path(s)", pathspec, len(data_paths))
+            logger.debug(
+                "Resolved pathspec %s to %d path(s)", pathspec, len(data_paths)
+            )
             for p in data_paths:
                 data = case.add_from_path(
                     p,
@@ -617,7 +619,9 @@ class Repository:
         logger.debug("Fetching index differences against remote %s", remote)
         self.load_index(remote)
         diff_all = self.index.diff(self.index_remote)
-        logger.debug("Fetch produced %d diff item(s) against remote %s", len(diff_all), remote)
+        logger.debug(
+            "Fetch produced %d diff item(s) against remote %s", len(diff_all), remote
+        )
         return diff_all
 
     def get_case(self, casespec: CaseSpec) -> Case | None:
@@ -637,7 +641,9 @@ class Repository:
             return None
         case = self.get_case(casespec)
         if case is not None:
-            logger.debug("Resolved data path request for %s in local repository", casespec)
+            logger.debug(
+                "Resolved data path request for %s in local repository", casespec
+            )
             return case.get_data(casespec.data_name)
         logger.info(f"The entry {casespec} does not exist in the repository.")
         return None
@@ -695,7 +701,9 @@ class Repository:
                             f"Trying to download {casespec} from a remote, but the config does not contain a remote with name {remote_name}."
                         )
                 if archive.exists():
-                    logger.debug("Found archive for %s at %s, decompressing", casespec, archive)
+                    logger.debug(
+                        "Found archive for %s at %s, decompressing", casespec, archive
+                    )
                     self._decompress_data(archive, casespec)
                     if data_path.exists():
                         return data_path

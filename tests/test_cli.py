@@ -89,6 +89,40 @@ def test_cli_verbose_enables_debug_logs(
     assert any("Initializing repository" in message for message in debug_messages)
     assert any("Adding entry" in message for message in debug_messages)
     assert any("Computing sha1" in message for message in debug_messages)
+    assert any("Attached data" in message for message in debug_messages)
+
+
+def test_cli_show_case_verbose_emits_case_debug_logs(caplog, monkeypatch):
+    runner = CliRunner()
+
+    from geodepot.case import Case
+    from geodepot.config import User
+
+    fake_case = Case(
+        "wippolder",
+        "case description",
+        changed_by=User(name="u", email="u@example.com"),
+    )
+    fake_repo = type("FakeRepository", (), {"get_case": lambda self, cs: fake_case})()
+    monkeypatch.setattr("geodepot.cli.Repository", lambda *args, **kwargs: fake_repo)
+    with caplog.at_level(logging.DEBUG):
+        result = runner.invoke(
+            geodepot_grp, ["-v", "show", "wippolder"], catch_exceptions=False
+        )
+        assert result.exit_code == 0
+
+    debug_messages = [
+        record.message
+        for record in caplog.records
+        if record.name.startswith("geodepot") and record.levelno == logging.DEBUG
+    ]
+    assert any(
+        "Parsing case specifier wippolder" in message for message in debug_messages
+    )
+    assert any(
+        "Serializing case wippolder for display" in message
+        for message in debug_messages
+    )
 
 
 def test_cli_default_keeps_debug_logs_off(
