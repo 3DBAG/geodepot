@@ -168,7 +168,7 @@ def get_cmd(ctx, casespec):
     repo = get_repository(ctx)
     cs = CaseSpec.from_str(casespec)
     data_path = repo.get_data_path(cs)
-    ctx.obj["logger"].info(f"{data_path}")
+    print(data_path)
 
 
 @command(
