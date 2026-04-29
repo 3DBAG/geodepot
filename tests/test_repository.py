@@ -221,9 +221,88 @@ def test_remove_missing_archive_ok(repo, wippolder_dir):
     assert repo.get_data(CaseSpec("wippolder", "wippolder.gpkg")) is None
 
 
+def test_push_rejects_whole_case_archive_only(repo, wippolder_dir, monkeypatch):
+    """push() should reject a local repo that only has a case-wide tar archive."""
+    repo.config.add_remote("ssh", "ssh://example.com:/srv/geodepot")
+    repo.add("wippolder", pathspec=str(wippolder_dir / "wippolder.gpkg"))
+    case_dir = repo.path_cases / "wippolder"
+    (case_dir / "wippolder.gpkg.tar").rename(case_dir / "wippolder.tar")
+
+    class FakeConnection:
+        def __init__(self, host):
+            self.host = host
+
+        def put(self, local, remote):
+            raise AssertionError("push() should fail before uploading")
+
+        def run(self, command):
+            raise AssertionError("push() should fail before running remote commands")
+
+    monkeypatch.setattr("fabric.Connection", FakeConnection)
+
+    with pytest.raises(GeodepotSyncError) as excinfo:
+        repo.push(RemoteName("ssh"), [])
+
+    message = str(excinfo.value)
+    assert "local invalid archive layout for wippolder" in message
+    assert str(case_dir / "wippolder.gpkg.tar") in message
+    assert str(case_dir / "wippolder.tar") in message
+
+
+def test_pull_rejects_whole_case_archive_only_remote(repo, monkeypatch):
+    """pull() should reject a remote repo that only has a case-wide tar archive."""
+    repo.config.add_remote("ssh", "ssh://example.com:/srv/geodepot")
+    remote_case = Case(name=CaseName("wippolder"), description=None)
+    remote_case.add_data(
+        Data(
+            Path("wippolder.gpkg"),
+            data_name=DataName("wippolder.gpkg"),
+            data_format="GPKG",
+        )
+    )
+    repo.index_remote = Index(cases={remote_case.name: remote_case})
+
+    class FakeConnection:
+        def __init__(self, host):
+            self.host = host
+
+        def run(self, command):
+            return type(
+                "Result",
+                (),
+                {
+                    "ok": True,
+                    "stdout": "wippolder.tar\n",
+                    "stderr": "",
+                },
+            )()
+
+        def get(self, local, remote):
+            raise AssertionError("pull() should fail before downloading")
+
+    monkeypatch.setattr("fabric.Connection", FakeConnection)
+
+    with pytest.raises(GeodepotSyncError) as excinfo:
+        repo.pull(RemoteName("ssh"), [])
+
+    message = str(excinfo.value)
+    assert "remote invalid archive layout for wippolder" in message
+    assert "/srv/geodepot/cases/wippolder/wippolder.gpkg.tar" in message
+    assert "/srv/geodepot/cases/wippolder/wippolder.tar" in message
+
+
 def test_pull_reports_failed_download_context(repo, monkeypatch):
     """pull() should report which archive and operation failed."""
     repo.config.add_remote("ssh", "ssh://example.com:/srv/geodepot")
+    remote_case = Case(name=CaseName("wippolder"), description=None)
+    remote_case.add_data(
+        Data(
+            Path("wippolder.gpkg"),
+            data_name=DataName("wippolder.gpkg"),
+            data_format="GPKG",
+        )
+    )
+    repo.index_remote = Index(cases={remote_case.name: remote_case})
     diff_all = [
         IndexDiff(
             status=Status.ADD,
@@ -234,6 +313,17 @@ def test_pull_reports_failed_download_context(repo, monkeypatch):
     class FakeConnection:
         def __init__(self, host):
             self.host = host
+
+        def run(self, command):
+            return type(
+                "Result",
+                (),
+                {
+                    "ok": True,
+                    "stdout": "wippolder.gpkg.tar\n",
+                    "stderr": "",
+                },
+            )()
 
         def get(self, local, remote):
             raise RuntimeError("sftp stat failed")
@@ -250,8 +340,17 @@ def test_pull_reports_failed_download_context(repo, monkeypatch):
 
 
 def test_pull_reports_failed_download_context_for_case(repo, monkeypatch):
-    """pull() should use the case directory for case archives."""
+    """pull() should report the per-data archive path for a new case."""
     repo.config.add_remote("ssh", "ssh://example.com:/srv/geodepot")
+    remote_case = Case(name=CaseName("ams-up-large"), description=None)
+    remote_case.add_data(
+        Data(
+            Path("ams-up-large.gpkg"),
+            data_name=DataName("ams-up-large.gpkg"),
+            data_format="GPKG",
+        )
+    )
+    repo.index_remote = Index(cases={remote_case.name: remote_case})
     diff_all = [
         IndexDiff(
             status=Status.ADD,
@@ -263,6 +362,17 @@ def test_pull_reports_failed_download_context_for_case(repo, monkeypatch):
         def __init__(self, host):
             self.host = host
 
+        def run(self, command):
+            return type(
+                "Result",
+                (),
+                {
+                    "ok": True,
+                    "stdout": "ams-up-large.gpkg.tar\n",
+                    "stderr": "",
+                },
+            )()
+
         def get(self, local, remote):
             raise RuntimeError("sftp stat failed")
 
@@ -273,13 +383,13 @@ def test_pull_reports_failed_download_context_for_case(repo, monkeypatch):
 
     message = str(excinfo.value)
     assert "download ams-up-large" in message
-    assert "/srv/geodepot/cases/ams-up-large/ams-up-large.tar" in message
-    assert str(repo.path_cases / "ams-up-large" / "ams-up-large.tar") in message
+    assert "/srv/geodepot/cases/ams-up-large/ams-up-large.gpkg.tar" in message
+    assert str(repo.path_cases / "ams-up-large" / "ams-up-large.gpkg.tar") in message
     assert "RuntimeError: sftp stat failed" in message
 
 
-def test_pull_falls_back_to_data_archives_for_missing_case_archive(repo, monkeypatch):
-    """pull() should handle remotes that have per-data archives but no case archive."""
+def test_pull_downloads_per_data_archives_for_added_case(repo, monkeypatch):
+    """pull() should download each per-data archive for a new case."""
     repo.config.add_remote("ssh", "ssh://example.com:/srv/geodepot")
     remote_case = Case(name=CaseName("bvz-dh-coast-5"), description=None)
     remote_case.add_data(
@@ -306,10 +416,19 @@ def test_pull_falls_back_to_data_archives_for_missing_case_archive(repo, monkeyp
         def __init__(self, host):
             self.host = host
 
+        def run(self, command):
+            return type(
+                "Result",
+                (),
+                {
+                    "ok": True,
+                    "stdout": "bvz_dh.tar\nprofile-tyler.json.tar\n",
+                    "stderr": "",
+                },
+            )()
+
         def get(self, local, remote):
             downloaded.append(remote)
-            if remote.endswith("/bvz-dh-coast-5/bvz-dh-coast-5.tar"):
-                raise FileNotFoundError(2, "No such file")
             Path(local).parent.mkdir(parents=True, exist_ok=True)
             Path(local).touch()
 
@@ -322,13 +441,12 @@ def test_pull_falls_back_to_data_archives_for_missing_case_archive(repo, monkeyp
 
     repo.pull(RemoteName("ssh"), diff_all)
 
-    assert downloaded == [
-        "/srv/geodepot/cases/bvz-dh-coast-5/bvz-dh-coast-5.tar",
+    assert set(downloaded[:-1]) == {
         "/srv/geodepot/cases/bvz-dh-coast-5/bvz_dh.tar",
         "/srv/geodepot/cases/bvz-dh-coast-5/profile-tyler.json.tar",
-        "/srv/geodepot/index.geojson",
-    ]
-    assert decompressed == [
+    }
+    assert downloaded[-1] == "/srv/geodepot/index.geojson"
+    assert set(decompressed) == {
         CaseSpec(remote_case.name, DataName("bvz_dh")),
         CaseSpec(remote_case.name, DataName("profile-tyler.json")),
-    ]
+    }

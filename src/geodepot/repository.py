@@ -133,6 +133,43 @@ def _format_sync_error(
     )
 
 
+def _data_archive_name(casespec: CaseSpec) -> str:
+    if casespec.data_name is None:
+        raise ValueError(f"{casespec} does not identify a data item")
+    return f"{casespec.data_name}{ARCHIVE_EXTENSION}"
+
+
+def _local_data_archive_path(root: Path, casespec: CaseSpec) -> Path:
+    return root / casespec.case_name / _data_archive_name(casespec)
+
+
+def _remote_data_archive_path(remote: Remote, casespec: CaseSpec) -> str:
+    return "/".join(
+        [remote.path_cases, str(casespec.case_name), _data_archive_name(casespec)]
+    )
+
+
+def _format_archive_layout_error(
+    operation: str,
+    case_name: CaseName,
+    missing: set[str],
+    unexpected: set[str],
+    root: str,
+) -> str:
+    details: list[str] = []
+    if missing:
+        details.append(
+            "missing "
+            + ", ".join(f"{root}/{case_name}/{name}" for name in sorted(missing))
+        )
+    if unexpected:
+        details.append(
+            "unexpected "
+            + ", ".join(f"{root}/{case_name}/{name}" for name in sorted(unexpected))
+        )
+    return f"{operation} invalid archive layout for {case_name}: " + "; ".join(details)
+
+
 def _ssh_connection(remote: Remote):
     from fabric import Connection
 
@@ -671,7 +708,7 @@ class Repository:
                 logger.debug("Data path exists locally for %s", casespec)
                 return data_path
             else:
-                archive = data_path.parent / (data_path.name + ARCHIVE_EXTENSION)
+                archive = _local_data_archive_path(self.path_cases, casespec)
                 if not archive.exists():
                     # Try downloading from remote
                     from requests import get as requests_get
@@ -683,9 +720,8 @@ class Repository:
                             casespec,
                             remote.name,
                         )
-                        casespec_archive = str(casespec) + ARCHIVE_EXTENSION
                         url_remote_archive = "/".join(
-                            [remote.url, GEODEPOT_CASES, casespec_archive]
+                            [remote.url, GEODEPOT_CASES, str(casespec.case_name), _data_archive_name(casespec)]
                         )
                         response = requests_get(url_remote_archive)
                         if response.status_code == 200:
@@ -721,6 +757,62 @@ class Repository:
                         )
         logger.info(f"The entry {casespec} does not exist in the repository.")
         return None
+
+    def _validate_archive_layout(self, remote_name: RemoteName | None = None) -> None:
+        """Ensure the repository only contains canonical per-data archives."""
+        if remote_name is None:
+            index = self.index
+            root = self.path_cases
+
+            def actual_archives_for_case(case_name: CaseName) -> set[str]:
+                return {p.name for p in (root / case_name).glob("*.tar")}
+
+            location = str(root)
+        else:
+            index = self.index_remote
+            remote = self.config.remotes.get(remote_name)
+            if remote is None:
+                raise GeodepotInvalidConfiguration(
+                    f"The remote '{remote_name}' is not configured for this repository."
+                )
+            conn_ssh = _ssh_connection(remote)
+
+            def actual_archives_for_case(case_name: CaseName) -> set[str]:
+                script = (
+                    "from pathlib import Path; import sys; "
+                    "p = Path(sys.argv[1]); "
+                    "print('\\n'.join(sorted(f.name for f in p.glob('*.tar'))))"
+                )
+                result = conn_ssh.run(
+                    f"python3 -c {shlex.quote(script)} {shlex.quote('/'.join([remote.path_cases, str(case_name)]))}"
+                )
+                if not result.ok:
+                    raise GeodepotSyncError(
+                        f"Failed to inspect archive layout on {remote_name}: {result.stderr}"
+                    )
+                return {line.strip() for line in result.stdout.splitlines() if line.strip()}
+
+            location = remote.path_cases
+
+        errors: list[str] = []
+        for case_name, case in index.cases.items():
+            expected = {f"{data_name}{ARCHIVE_EXTENSION}" for data_name in case.data}
+            actual = actual_archives_for_case(case_name)
+            missing = expected.difference(actual)
+            unexpected = actual.difference(expected)
+            if missing or unexpected:
+                errors.append(
+                    _format_archive_layout_error(
+                        "remote" if remote_name is not None else "local",
+                        case_name,
+                        missing,
+                        unexpected,
+                        location,
+                    )
+                )
+
+        if errors:
+            raise GeodepotSyncError("; ".join(errors))
 
     def init_case(self, casespec: CaseSpec) -> Case:
         """Create a new case an return it."""
@@ -807,35 +899,41 @@ class Repository:
 
         # See comments in 'push'. Here we do the opposite, because we overwrite the
         # local with the remote.
+        cases_to_download = set(
+            i.casespec_other for i in diff_all if i.status == Status.ADD and i.casespec_other and i.casespec_other.is_case
+        )
         data_to_download = set(
             i.casespec_other
             for i in diff_all
-            if i.status == Status.ADD or i.status == Status.MODIFY
+            if i.status in (Status.ADD, Status.MODIFY)
+            and i.casespec_other
+            and i.casespec_other.is_data
         )
         data_to_delete = set(
-            i.casespec_self for i in diff_all if i.status == Status.DELETE
+            i.casespec_self
+            for i in diff_all
+            if i.status == Status.DELETE and i.casespec_self and i.casespec_self.is_data
+        )
+        cases_to_delete = set(
+            i.casespec_self
+            for i in diff_all
+            if i.status == Status.DELETE and i.casespec_self and i.casespec_self.is_case
         )
 
+        self._validate_archive_layout()
         conn_ssh = _ssh_connection(remote)
+        self._validate_archive_layout(remote_name)
         errors: list[tuple[str, Exception]] = []
         logger.debug(
             "Pull plan for %s: download=%d delete=%d",
             remote_name,
-            len(data_to_download),
+            len(cases_to_download) + len(data_to_download),
             len(data_to_delete),
         )
 
-        def download_archive(data: CaseSpec) -> None:
-            if data.is_case:
-                archive_name = f"{data.case_name}{ARCHIVE_EXTENSION}"
-                archive_parent = data.case_name
-            else:
-                archive_name = f"{data.data_name}{ARCHIVE_EXTENSION}"
-                archive_parent = data.case_name
-            archive_path_remote = "/".join(
-                [remote.path_cases, archive_parent, archive_name]
-            )
-            local_archive = self.path_cases / archive_parent / archive_name
+        def download_data_archive(data: CaseSpec) -> None:
+            archive_path_remote = _remote_data_archive_path(remote, data)
+            local_archive = _local_data_archive_path(self.path_cases, data)
             local_archive.parent.mkdir(parents=True, exist_ok=True)
             logger.debug(
                 "Downloading %s from %s to %s",
@@ -857,102 +955,56 @@ class Repository:
                 for data_name in remote_case.data
             ]
 
-        for data in data_to_download:
+        data_specs_to_download = set(data_to_download)
+        for data in cases_to_download:
+            data_specs_to_download.update(remote_data_specs(data))
+
+        logger.debug(
+            "Pull archive plan for %s: download=%d delete=%d",
+            remote_name,
+            len(data_specs_to_download),
+            len(data_to_delete),
+        )
+
+        for data in data_specs_to_download:
             try:
-                download_archive(data)
-            except FileNotFoundError as e:
-                if not data.is_case:
-                    archive_name = f"{data.data_name}{ARCHIVE_EXTENSION}"
-                    archive_parent = data.case_name
-                    archive_path_remote = "/".join(
-                        [remote.path_cases, archive_parent, archive_name]
-                    )
-                    local_archive = self.path_cases / archive_parent / archive_name
-                    error_detail = _format_sync_error(
-                        "download", data, archive_path_remote, str(local_archive), e
-                    )
-                    logger.error(error_detail, exc_info=True)
-                    errors.append((error_detail, e))
-                    continue
-
-                data_specs = remote_data_specs(data)
-                if len(data_specs) == 0:
-                    archive_name = f"{data.case_name}{ARCHIVE_EXTENSION}"
-                    archive_path_remote = "/".join(
-                        [remote.path_cases, data.case_name, archive_name]
-                    )
-                    local_archive = self.path_cases / data.case_name / archive_name
-                    error_detail = _format_sync_error(
-                        "download", data, archive_path_remote, str(local_archive), e
-                    )
-                    logger.error(error_detail, exc_info=True)
-                    errors.append((error_detail, e))
-                    continue
-
-                logger.debug(
-                    "Case archive for %s was not found; downloading %d data archive(s)",
-                    data,
-                    len(data_specs),
-                )
-                for data_spec in data_specs:
-                    try:
-                        download_archive(data_spec)
-                    except Exception as data_error:
-                        archive_name = f"{data_spec.data_name}{ARCHIVE_EXTENSION}"
-                        archive_path_remote = "/".join(
-                            [remote.path_cases, data_spec.case_name, archive_name]
-                        )
-                        local_archive = (
-                            self.path_cases / data_spec.case_name / archive_name
-                        )
-                        error_detail = _format_sync_error(
-                            "download",
-                            data_spec,
-                            archive_path_remote,
-                            str(local_archive),
-                            data_error,
-                        )
-                        logger.error(error_detail, exc_info=True)
-                        errors.append((error_detail, data_error))
+                download_data_archive(data)
             except Exception as e:
-                if data.is_case:
-                    archive_name = f"{data.case_name}{ARCHIVE_EXTENSION}"
-                    archive_parent = data.case_name
-                else:
-                    archive_name = f"{data.data_name}{ARCHIVE_EXTENSION}"
-                    archive_parent = data.case_name
-                archive_path_remote = "/".join(
-                    [remote.path_cases, archive_parent, archive_name]
-                )
-                local_archive = self.path_cases / archive_parent / archive_name
+                archive_path_remote = _remote_data_archive_path(remote, data)
+                local_archive = _local_data_archive_path(self.path_cases, data)
                 error_detail = _format_sync_error(
                     "download", data, archive_path_remote, str(local_archive), e
                 )
                 logger.error(error_detail, exc_info=True)
                 errors.append((error_detail, e))
+        for data in cases_to_delete:
+            local_path = self.path_cases.joinpath(data.to_path())
+            logger.debug("Deleting local case %s at %s", data, local_path)
+            try:
+                rmtree(local_path)
+            except Exception as e:
+                error_detail = _format_sync_error(
+                    "delete", data, str(local_path), "<local>", e
+                )
+                logger.error(error_detail, exc_info=True)
+                errors.append((error_detail, e))
         for data in data_to_delete:
-            if data.is_case:
-                local_path = self.path_cases.joinpath(data.to_path())
-                logger.debug("Deleting local case %s at %s", data, local_path)
-                try:
+            local_path = self.path_cases.joinpath(data.to_path())
+            logger.debug("Deleting local data %s at %s", data, local_path)
+            try:
+                if local_path.is_dir():
                     rmtree(local_path)
-                except Exception as e:
-                    error_detail = _format_sync_error(
-                        "delete", data, str(local_path), "<local>", e
-                    )
-                    logger.error(error_detail, exc_info=True)
-                    errors.append((error_detail, e))
-            else:
-                local_path = self.path_cases.joinpath(data.to_path())
-                logger.debug("Deleting local data %s at %s", data, local_path)
-                try:
-                    local_path.unlink()
-                except Exception as e:
-                    error_detail = _format_sync_error(
-                        "delete", data, str(local_path), "<local>", e
-                    )
-                    logger.error(error_detail, exc_info=True)
-                    errors.append((error_detail, e))
+                else:
+                    local_path.unlink(missing_ok=True)
+                _local_data_archive_path(self.path_cases, data).unlink(
+                    missing_ok=True
+                )
+            except Exception as e:
+                error_detail = _format_sync_error(
+                    "delete", data, str(local_path), "<local>", e
+                )
+                logger.error(error_detail, exc_info=True)
+                errors.append((error_detail, e))
 
         if errors:
             raise GeodepotSyncError(
@@ -984,119 +1036,131 @@ class Repository:
                 f"The remote '{remote}' must use an ssh/sftp protocol in order to push changes."
             )
 
-        # i.status == Status.DELETE, because if the remote does not contain a data, it
-        # shows as it deleted it
+        case_to_upload = set(
+            i.casespec_self
+            for i in diff_all
+            if i.status == Status.DELETE and i.casespec_self and i.casespec_self.is_case
+        )
         data_to_upload = set(
             i.casespec_self
             for i in diff_all
-            if i.status == Status.DELETE or i.status == Status.MODIFY
+            if i.status in (Status.DELETE, Status.MODIFY)
+            and i.casespec_self
+            and i.casespec_self.is_data
         )
-        # Similarly, i.status == Status.ADD, because the remote contains a data that the
-        # local doesn't, thus it 'adds' it w.r.t to the local. Since we push, we
-        # overwrite the remote, meaning that if the local doesn't contain a specific
-        # data, the remote shouldn't have it either.
+        case_to_delete = set(
+            i.casespec_other
+            for i in diff_all
+            if i.status == Status.ADD and i.casespec_other and i.casespec_other.is_case
+        )
         data_to_delete = set(
-            i.casespec_other for i in diff_all if i.status == Status.ADD
+            i.casespec_other
+            for i in diff_all
+            if i.status == Status.ADD
+            and i.casespec_other
+            and i.casespec_other.is_data
         )
 
+        self._validate_archive_layout()
         conn_ssh = _ssh_connection(remote)
         errors: list[tuple[str, Exception]] = []
         logger.debug(
             "Push plan for %s: upload=%d delete=%d",
             remote_name,
-            len(data_to_upload),
-            len(data_to_delete),
+            len(case_to_upload) + len(data_to_upload),
+            len(case_to_delete) + len(data_to_delete),
         )
 
-        for data in data_to_upload:
-            if data.is_case:
-                # Upload a whole case
-                case_path_remote = "/".join([remote.path_cases, str(data)])
-                # Create the case dir
-                try:
-                    result = conn_ssh.run(f"mkdir -p {shlex.quote(case_path_remote)}")
-                    if not result.ok:
-                        errors.append((str(data), RuntimeError(result.stderr)))
-                        continue
-                except Exception as e:
-                    errors.append((str(data), e))
+        def upload_data_archive(data: CaseSpec) -> None:
+            archive_path_local = _local_data_archive_path(self.path_cases, data)
+            archive_path_remote = _remote_data_archive_path(remote, data)
+            logger.debug(
+                "Uploading %s from %s to %s",
+                data,
+                archive_path_local,
+                archive_path_remote,
+            )
+            logger.debug(f"PUT local={archive_path_local} remote={archive_path_remote}")
+            _ = conn_ssh.put(local=archive_path_local, remote=archive_path_remote)
+            logger.info(f"Uploaded {data} to {remote.name}")
+
+        for data in case_to_upload:
+            case_path_remote = "/".join([remote.path_cases, str(data.case_name)])
+            try:
+                result = conn_ssh.run(f"mkdir -p {shlex.quote(case_path_remote)}")
+                if not result.ok:
+                    errors.append((str(data), RuntimeError(result.stderr)))
                     continue
-                # Upload each archive in the case
-                for dirpath, dirnames, filenames in self.path_cases.joinpath(
-                    data.to_path()
-                ).walk():
-                    for filename in filenames:
-                        path_local = Path(dirpath, filename)
-                        if path_local.suffixes[-1] == ARCHIVE_EXTENSION:
-                            archive_path_local = path_local
-                            # here data is just the case name
-                            archive_path_remote = "/".join(
-                                [remote.path_cases, str(data), filename]
-                            )
-                            logger.debug(
-                                "Uploading %s from %s to %s",
-                                data,
-                                archive_path_local,
-                                archive_path_remote,
-                            )
-                            try:
-                                logger.debug(
-                                    f"PUT local={archive_path_local} remote={archive_path_remote}"
-                                )
-                                _ = conn_ssh.put(
-                                    local=archive_path_local, remote=archive_path_remote
-                                )
-                                logger.info(f"Uploaded {data} to {remote.name}")
-                            except Exception as e:
-                                error_detail = _format_sync_error(
-                                    "upload",
-                                    data,
-                                    str(archive_path_local),
-                                    archive_path_remote,
-                                    e,
-                                )
-                                logger.error(error_detail, exc_info=True)
-                                errors.append((error_detail, e))
-            else:
-                # Upload a single data file
-                casespec_archive = str(data) + ARCHIVE_EXTENSION
-                archive_path_local = self.path_cases.joinpath(casespec_archive)
-                archive_path_remote = "/".join([remote.path_cases, casespec_archive])
-                logger.debug(
-                    "Uploading %s from %s to %s",
-                    data,
-                    archive_path_local,
-                    archive_path_remote,
-                )
+            except Exception as e:
+                errors.append((str(data), e))
+                continue
+            case = self.index.cases.get(data.case_name)
+            if case is None:
+                errors.append((str(data), RuntimeError("missing local case")))
+                continue
+            for data_name in case.data:
+                data_spec = CaseSpec(case_name=data.case_name, data_name=data_name)
                 try:
-                    logger.debug(
-                        f"PUT local={archive_path_local} remote={archive_path_remote}"
-                    )
-                    _ = conn_ssh.put(
-                        local=archive_path_local, remote=archive_path_remote
-                    )
-                    logger.info(f"Uploaded {data} to {remote.name}")
+                    upload_data_archive(data_spec)
                 except Exception as e:
                     error_detail = _format_sync_error(
                         "upload",
-                        data,
-                        str(archive_path_local),
-                        archive_path_remote,
+                        data_spec,
+                        str(_local_data_archive_path(self.path_cases, data_spec)),
+                        _remote_data_archive_path(remote, data_spec),
                         e,
                     )
                     logger.error(error_detail, exc_info=True)
                     errors.append((error_detail, e))
-        for data in data_to_delete:
-            casespec_archive = str(data) + ARCHIVE_EXTENSION
-            archive_path_remote = "/".join([remote.path_cases, casespec_archive])
+
+        for data in data_to_upload:
             try:
-                if data.is_case:
-                    # Delete a whole case
-                    case_path_remote = "/".join([remote.path_cases, str(data)])
-                    result = conn_ssh.run(f"rm -rf {shlex.quote(case_path_remote)}")
+                upload_data_archive(data)
+            except Exception as e:
+                error_detail = _format_sync_error(
+                    "upload",
+                    data,
+                    str(_local_data_archive_path(self.path_cases, data)),
+                    _remote_data_archive_path(remote, data),
+                    e,
+                )
+                logger.error(error_detail, exc_info=True)
+                errors.append((error_detail, e))
+
+        for data in case_to_delete:
+            case_path_remote = "/".join([remote.path_cases, str(data.case_name)])
+            try:
+                result = conn_ssh.run(f"rm -rf {shlex.quote(case_path_remote)}")
+                if not result.ok:
+                    delete_error = RuntimeError(result.stderr)
+                    error_detail = _format_sync_error(
+                        "delete",
+                        data,
+                        case_path_remote,
+                        "<remote>",
+                        delete_error,
+                    )
+                    logger.error(error_detail)
+                    errors.append((error_detail, delete_error))
                 else:
-                    # Delete a data file
-                    result = conn_ssh.run(f"rm {shlex.quote(archive_path_remote)}")
+                    logger.info(f"Deleted {data} on {remote.name}")
+            except Exception as e:
+                error_detail = _format_sync_error(
+                    "delete",
+                    data,
+                    case_path_remote,
+                    "<remote>",
+                    e,
+                )
+                logger.error(error_detail, exc_info=True)
+                errors.append((error_detail, e))
+        for data in data_to_delete:
+            archive_path_remote = _remote_data_archive_path(remote, data)
+            data_path_remote = "/".join([remote.path_cases, str(data.to_path())])
+            try:
+                result = conn_ssh.run(
+                    f"rm -rf {shlex.quote(data_path_remote)} {shlex.quote(archive_path_remote)}"
+                )
                 if not result.ok:
                     delete_error = RuntimeError(result.stderr)
                     error_detail = _format_sync_error(
@@ -1153,13 +1217,14 @@ class Repository:
             if (case := self.get_case(casespec)) is not None:
                 data = case.remove_data(casespec.data_name)
                 if data is not None:
-                    if (p := self.path_cases.joinpath(casespec.to_path())).is_dir():
-                        p.rmdir()
+                    p = self.path_cases.joinpath(casespec.to_path())
+                    if p.is_dir():
+                        rmtree(p)
                     else:
                         p.unlink(missing_ok=True)
-                        (p.parent / (p.name + ARCHIVE_EXTENSION)).unlink(
-                            missing_ok=True
-                        )
+                    (p.parent / (p.name + ARCHIVE_EXTENSION)).unlink(
+                        missing_ok=True
+                    )
                         # TODO: I could remove the whole case if there are no more files. Don't forget to remove the case from the index too.
                     self.index.write(self.path_index)
                     logger.info(f"Removed {data.name} from the repository")

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Enforced the canonical per-data archive layout (`.geodepot/cases/<case>/<data>.tar`) across sync, `get`, and integration tests, and removed the old whole-case archive fallback.
+
 ## [1.0.9] - 2026-04-28
 
 - Made `geodepot get` print only the resolved case path on stdout, so it can be used directly in scripts.
