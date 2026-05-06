@@ -3,8 +3,6 @@ set shell := ["bash", "-uc"]
 _default:
     @just --list
 
-# Use `pixi` for project tooling and environment-managed commands.
-# These recipes are thin wrappers so `just` remains the single entry point.
 lint:
     pixi run -e dev lint
 
@@ -17,7 +15,7 @@ format-check:
 test:
     pixi run -e dev test
 
-integration-test:
+test-integration:
     just up
     trap 'just down' EXIT; pixi run -e dev integration-test
 

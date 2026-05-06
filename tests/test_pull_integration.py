@@ -35,9 +35,7 @@ def test_pull_downloads_and_extracts_data_from_docker_ssh(
         geodepot_grp, ["remote", "add", "ssh", REMOTE_URL], catch_exceptions=False
     )
     assert result.exit_code == 0
-    result = runner.invoke(
-        geodepot_grp, ["pull", "-y", "ssh"], catch_exceptions=False
-    )
+    result = runner.invoke(geodepot_grp, ["pull", "-y", "ssh"], catch_exceptions=False)
     assert result.exit_code == 0
 
     local_case_dir = tmp_path / ".geodepot" / "cases" / "wippolder"
@@ -58,7 +56,9 @@ def test_pull_downloads_and_extracts_data_from_docker_ssh(
 
 
 @pytest.mark.integration
-def test_push_uploads_data_archive_only(tmp_path, monkeypatch, data_dir, mock_user_home):
+def test_push_uploads_data_archive_only(
+    tmp_path, monkeypatch, data_dir, mock_user_home
+):
     server_repo = data_dir / "integration" / "server" / ".geodepot"
     _reset_server_repo(server_repo)
 
@@ -73,13 +73,15 @@ def test_push_uploads_data_archive_only(tmp_path, monkeypatch, data_dir, mock_us
     assert result.exit_code == 0
     result = runner.invoke(
         geodepot_grp,
-        ["add", "wippolder", str(data_dir / "sources" / "wippolder" / "wippolder.gpkg")],
+        [
+            "add",
+            "wippolder",
+            str(data_dir / "sources" / "wippolder" / "wippolder.gpkg"),
+        ],
         catch_exceptions=False,
     )
     assert result.exit_code == 0
-    result = runner.invoke(
-        geodepot_grp, ["push", "-y", "ssh"], catch_exceptions=False
-    )
+    result = runner.invoke(geodepot_grp, ["push", "-y", "ssh"], catch_exceptions=False)
     assert result.exit_code == 0
 
     remote_case_dir = server_repo / "cases" / "wippolder"

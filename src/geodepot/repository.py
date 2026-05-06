@@ -721,7 +721,12 @@ class Repository:
                             remote.name,
                         )
                         url_remote_archive = "/".join(
-                            [remote.url, GEODEPOT_CASES, str(casespec.case_name), _data_archive_name(casespec)]
+                            [
+                                remote.url,
+                                GEODEPOT_CASES,
+                                str(casespec.case_name),
+                                _data_archive_name(casespec),
+                            ]
                         )
                         response = requests_get(url_remote_archive)
                         if response.status_code == 200:
@@ -790,7 +795,9 @@ class Repository:
                     raise GeodepotSyncError(
                         f"Failed to inspect archive layout on {remote_name}: {result.stderr}"
                     )
-                return {line.strip() for line in result.stdout.splitlines() if line.strip()}
+                return {
+                    line.strip() for line in result.stdout.splitlines() if line.strip()
+                }
 
             location = remote.path_cases
 
@@ -900,7 +907,9 @@ class Repository:
         # See comments in 'push'. Here we do the opposite, because we overwrite the
         # local with the remote.
         cases_to_download = set(
-            i.casespec_other for i in diff_all if i.status == Status.ADD and i.casespec_other and i.casespec_other.is_case
+            i.casespec_other
+            for i in diff_all
+            if i.status == Status.ADD and i.casespec_other and i.casespec_other.is_case
         )
         data_to_download = set(
             i.casespec_other
@@ -996,9 +1005,7 @@ class Repository:
                     rmtree(local_path)
                 else:
                     local_path.unlink(missing_ok=True)
-                _local_data_archive_path(self.path_cases, data).unlink(
-                    missing_ok=True
-                )
+                _local_data_archive_path(self.path_cases, data).unlink(missing_ok=True)
             except Exception as e:
                 error_detail = _format_sync_error(
                     "delete", data, str(local_path), "<local>", e
@@ -1056,9 +1063,7 @@ class Repository:
         data_to_delete = set(
             i.casespec_other
             for i in diff_all
-            if i.status == Status.ADD
-            and i.casespec_other
-            and i.casespec_other.is_data
+            if i.status == Status.ADD and i.casespec_other and i.casespec_other.is_data
         )
 
         self._validate_archive_layout()
@@ -1222,10 +1227,8 @@ class Repository:
                         rmtree(p)
                     else:
                         p.unlink(missing_ok=True)
-                    (p.parent / (p.name + ARCHIVE_EXTENSION)).unlink(
-                        missing_ok=True
-                    )
-                        # TODO: I could remove the whole case if there are no more files. Don't forget to remove the case from the index too.
+                    (p.parent / (p.name + ARCHIVE_EXTENSION)).unlink(missing_ok=True)
+                    # TODO: I could remove the whole case if there are no more files. Don't forget to remove the case from the index too.
                     self.index.write(self.path_index)
                     logger.info(f"Removed {data.name} from the repository")
                 else:

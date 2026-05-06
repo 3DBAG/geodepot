@@ -10,6 +10,7 @@
 /build
 /dist
 /logs
+/result
 
 /experiments/pyinstaller/geodepot.spec
 /experiments/pyinstaller/build/
