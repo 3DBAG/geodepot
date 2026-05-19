@@ -9,6 +9,9 @@
             "PIXI_VERSION": "v0.68.1"
         }
     },
+    "features": {
+        "ghcr.io/balazsdukai/devcontainer-tools/tools:1": {}
+    },
    
   "customizations" : {
     "jetbrains" : {
