@@ -65,18 +65,22 @@ Use `pixi` to set up the development environment and run tools.
 ## Developer Recipes
 
 Use `just` as the local entry point. The recipes below all delegate to `pixi` so the toolchain stays in one place.
+Copy `.env.example` to `.env` for machine-specific settings. `just` loads `.env` automatically.
 
 - `just lint`
 - `just format`
 - `just format-check`
-- `just test` (unit suite, excludes Docker-backed integration tests)
-- `just integration-test` (starts Docker, runs integration tests, stops Docker)
+- `just test` (unit suite, excludes container-backed integration tests)
+- `just integration-test` (starts Docker/Podman, runs integration tests, stops the test server)
 - `just docs-build`
 - `just docs-deploy`
 - `just download-data`
 - `just upload-data`
 - `just up`
 - `just down`
+
+The integration recipes use `docker compose` by default. Set
+`GEODEPOT_COMPOSE="podman compose"` in `.env` to use Podman Compose instead.
 
 ## Interfaces
 

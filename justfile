@@ -1,4 +1,7 @@
 set shell := ["bash", "-uc"]
+set dotenv-load := true
+
+compose := env_var_or_default("GEODEPOT_COMPOSE", "docker compose")
 
 _default:
     @just --list
@@ -34,7 +37,7 @@ upload-data:
     rm data.zip
 
 up:
-    SSH_PUBLIC_KEY="$(cat ~/.ssh/id_rsa.pub)" docker compose -f docker/docker-compose.yaml up -d
+    SSH_PUBLIC_KEY="$({ cat tests/data/mock_user_home/.ssh/id_rsa.pub 2>/dev/null || cat ~/.ssh/id_rsa.pub; } | head -n 1)" {{compose}} -f docker/docker-compose.yaml up --build --force-recreate -d
 
 down:
-    docker compose -f docker/docker-compose.yaml down
+    {{compose}} -f docker/docker-compose.yaml down --volumes --remove-orphans

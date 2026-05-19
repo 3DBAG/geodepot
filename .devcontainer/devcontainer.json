@@ -18,8 +18,14 @@
     "runArgs": [
         "--userns=keep-id"
     ],
+    "containerEnv": {
+        "DOCKER_HOST": "unix:///var/run/docker.sock",
+        "GEODEPOT_HOST_WORKSPACE": "${localWorkspaceFolder}",
+        "GEODEPOT_TEST_REMOTE_HOST": "host.containers.internal"
+    },
     "mounts": [
-        "source=${localWorkspaceFolderBasename}-pixi,target=${containerWorkspaceFolder}/.pixi,type=volume"
+        "source=${localWorkspaceFolderBasename}-pixi,target=${containerWorkspaceFolder}/.pixi,type=volume",
+        "source=${localEnv:GEODEPOT_CONTAINER_SOCKET},target=/var/run/docker.sock,type=bind"
     ],
     "postCreateCommand": "pixi install"
 }

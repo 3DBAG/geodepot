@@ -1,4 +1,5 @@
 import json
+import os
 import tarfile
 from pathlib import Path
 from shutil import rmtree
@@ -9,7 +10,8 @@ from click.testing import CliRunner
 from geodepot.cli import geodepot_grp
 
 
-REMOTE_URL = "ssh://root@localhost:2222:/srv/geodepot/.geodepot"
+REMOTE_HOST = os.environ.get("GEODEPOT_TEST_REMOTE_HOST", "localhost")
+REMOTE_URL = f"ssh://root@{REMOTE_HOST}:2222:/srv/geodepot/.geodepot"
 
 
 @pytest.mark.integration
