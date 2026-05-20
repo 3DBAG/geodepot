@@ -1,6 +1,9 @@
-FROM ubuntu:22.04
+FROM ubuntu:26.04
 
-RUN apt-get update && apt-get install -y nginx openssh-server && rm -rf /var/lib/apt/lists/*
+RUN export DEBIAN_FRONTEND=noninteractive \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends nginx openssh-server \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY nginx_server.conf /etc/nginx/sites-available/geodepot.conf
 RUN ln -s /etc/nginx/sites-available/geodepot.conf /etc/nginx/sites-enabled/geodepot.conf \
