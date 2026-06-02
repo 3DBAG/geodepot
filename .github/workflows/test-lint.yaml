@@ -2,7 +2,7 @@ name: Install, Lint, Format, Test
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "develop"]
 
 jobs:
   all:
