@@ -156,17 +156,24 @@ def _format_archive_layout_error(
     unexpected: set[str],
     root: str,
 ) -> str:
+    # Use PurePosixPath for remote paths (which use forward slashes)
+    # and Path for local paths (which use OS-specific separators)
+    if "/" in root:
+        from pathlib import PurePosixPath
+
+        root_path: Path = PurePosixPath(root)
+    else:
+        root_path = Path(root)
+
     details: list[str] = []
     if missing:
-        details.append(
-            "missing "
-            + ", ".join(f"{root}/{case_name}/{name}" for name in sorted(missing))
-        )
+        missing_paths = [str(root_path / case_name / name) for name in sorted(missing)]
+        details.append("missing " + ", ".join(missing_paths))
     if unexpected:
-        details.append(
-            "unexpected "
-            + ", ".join(f"{root}/{case_name}/{name}" for name in sorted(unexpected))
-        )
+        unexpected_paths = [
+            str(root_path / case_name / name) for name in sorted(unexpected)
+        ]
+        details.append("unexpected " + ", ".join(unexpected_paths))
     return f"{operation} invalid archive layout for {case_name}: " + "; ".join(details)
 
 

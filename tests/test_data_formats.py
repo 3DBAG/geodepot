@@ -70,18 +70,20 @@ class TestDataFormatDetection:
         data_name = Path(file_path).name
         data = repo.get_data(CaseSpec("test", data_name))
         assert data is not None, f"Data not found in repo for {file_path}"
-        assert (
-            data.format == expected_format
-        ), f"Format mismatch for {file_path}: expected {expected_format}, got {data.format}"
-        assert (
-            data.driver == expected_driver
-        ), f"Driver mismatch for {file_path}: expected {expected_driver}, got {data.driver}"
+        assert data.format == expected_format, (
+            f"Format mismatch for {file_path}: expected {expected_format}, got {data.format}"
+        )
+        assert data.driver == expected_driver, (
+            f"Driver mismatch for {file_path}: expected {expected_driver}, got {data.driver}"
+        )
 
 
 class TestCityJSONFormats:
     """Tests for CityJSON format variations."""
 
-    def test_add_cityjson_standard(self, tmp_path, monkeypatch, mock_user_home, wippolder_dir):
+    def test_add_cityjson_standard(
+        self, tmp_path, monkeypatch, mock_user_home, wippolder_dir
+    ):
         """Test adding standard CityJSON file (.city.json)."""
         cityjson_path = wippolder_dir / "3dbag-10-286-560.city.json"
         assert cityjson_path.exists()
@@ -390,7 +392,9 @@ class TestFormatOverride:
 class TestDataWithMetadata:
     """Tests for adding data with metadata (description, license)."""
 
-    def test_add_with_description(self, tmp_path, monkeypatch, mock_user_home, wippolder_dir):
+    def test_add_with_description(
+        self, tmp_path, monkeypatch, mock_user_home, wippolder_dir
+    ):
         """Test adding data with a description."""
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         runner = CliRunner()
@@ -416,7 +420,9 @@ class TestDataWithMetadata:
         assert data is not None
         assert data.description == "This is a test GeoPackage"
 
-    def test_add_with_license(self, tmp_path, monkeypatch, mock_user_home, wippolder_dir):
+    def test_add_with_license(
+        self, tmp_path, monkeypatch, mock_user_home, wippolder_dir
+    ):
         """Test adding data with a license."""
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         runner = CliRunner()

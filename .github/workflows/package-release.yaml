@@ -78,42 +78,43 @@ jobs:
       - name: Run unit tests
         run: pixi run -e dev test
 
-      - name: Build geodepot package
+      - name: Install default environment
+        run: pixi install --environment default
+
+      - name: Build geodepot package (for audit/verification)
         run: pixi build --path pyproject.toml --output-dir build/conda
-
-      - if: runner.os != 'Windows'
-        name: Store built package path non-Windows
-        run: echo "GEODEPOT_CONDA=$(echo build/conda/geodepot-*.conda)" >> "$GITHUB_ENV"
-
-      - if: runner.os == 'Windows'
-        name: Store built package path Windows
-        run: echo "GEODEPOT_CONDA=$(Resolve-Path 'build/conda/geodepot-*.conda')" >> $env:GITHUB_ENV
 
       - if: runner.os != 'Windows'
         name: Create release bundle non-Windows
         run: |
           mkdir -p dist/geodepot
-          pixi exec --spec pixi-pack -- pixi-pack --environment default --inject "$GEODEPOT_CONDA" --output-file dist/environment.tar pyproject.toml
-          cd dist/geodepot
-          pixi exec --spec pixi-unpack -- pixi-unpack ../environment.tar
-          # The wrapper starts Geodepot directly; the generated activation scripts
-          # are not needed and may contain build-path references.
-          rm -rf activate* deactivate*
-          python ../../packaging/ci/remove_path_leaking_bin_wrappers.py . "$GITHUB_WORKSPACE"
-          install -m 755 ../../packaging/pixi/geodepot.sh ./geodepot
+          # Get the pixi environment path using JSON output for robustness
+          PIXI_ENV=$(pixi info --json | python3 -c "import json, sys; data = json.load(sys.stdin); env = [e for e in data['environments_info'] if e['name'] == 'default'][0]; print(env['prefix'])")
+          # Copy the entire environment to the bundle
+          cp -r "$PIXI_ENV" dist/geodepot/env
+          # Clean up activation scripts that may contain build-path references
+          rm -rf dist/geodepot/env/etc/conda/activate.d
+          rm -rf dist/geodepot/env/etc/conda/deactivate.d
+          # Remove path-leaking bin wrappers
+          python packaging/ci/remove_path_leaking_bin_wrappers.py dist/geodepot/env "$GITHUB_WORKSPACE"
+          # Add wrapper script
+          cp packaging/pixi/geodepot.sh dist/geodepot/geodepot
+          chmod +x dist/geodepot/geodepot
 
       - if: runner.os == 'Windows'
         name: Create release bundle Windows
         run: |
           New-Item -ItemType Directory -Force dist\geodepot | Out-Null
-          pixi exec --spec pixi-pack -- pixi-pack --environment default --inject "$env:GEODEPOT_CONDA" --output-file dist/environment.tar pyproject.toml
-          Push-Location dist\geodepot
-          pixi exec --spec pixi-unpack -- pixi-unpack ..\environment.tar
-          # The wrapper starts Geodepot directly; the generated activation scripts
-          # are not needed and may contain build-path references.
-          Remove-Item -Recurse -Force activate*, deactivate* -ErrorAction SilentlyContinue
-          python ..\..\packaging\ci\remove_path_leaking_bin_wrappers.py . "$env:GITHUB_WORKSPACE"
-          Pop-Location
+          # Get the pixi environment path using JSON output for robustness
+          $pixiEnv = pixi info --json | python3 -c "import json, sys; data = json.load(sys.stdin); env = [e for e in data['environments_info'] if e['name'] == 'default'][0]; print(env['prefix'])"
+          # Copy the entire environment to the bundle
+          Copy-Item -Recurse -Force "$pixiEnv" dist\geodepot\env
+          # Clean up activation scripts that may contain build-path references
+          Remove-Item -Recurse -Force dist\geodepot\env\etc\conda\activate.d -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force dist\geodepot\env\etc\conda\deactivate.d -ErrorAction SilentlyContinue
+          # Remove path-leaking bin wrappers
+          python packaging\ci\remove_path_leaking_bin_wrappers.py dist\geodepot\env "$env:GITHUB_WORKSPACE"
+          # Add wrapper scripts
           Copy-Item packaging\pixi\geodepot.cmd dist\geodepot\geodepot.cmd
           Copy-Item packaging\pixi\geodepot.ps1 dist\geodepot\geodepot.ps1
 
@@ -122,11 +123,12 @@ jobs:
         run: |
           # The bundle does not use MKL's MPI-backed BLACS/scaLAPACK helpers.
           # Keeping them would make the archive depend on an external MPI runtime.
+          # Also prune other problematic DLLs
           Remove-Item -Path @(
             'dist\geodepot\env\Library\bin\mkl_blacs_*.dll'
             'dist\geodepot\env\Library\bin\mkl_scalapack_*.dll'
-          ) -Force `
-            -ErrorAction SilentlyContinue
+            'dist\geodepot\env\Library\bin\libiomp5md.dll'
+          ) -Force -ErrorAction SilentlyContinue
 
       - if: runner.os == 'Linux'
         name: Add installer scripts to dist
@@ -147,6 +149,9 @@ jobs:
           rm -rf smoke/relocated
           mkdir -p smoke/relocated
           cp -R "${GITHUB_WORKSPACE}/dist/geodepot" "${GITHUB_WORKSPACE}/smoke/relocated/geodepot"
+          # The bundle is now self-contained with env/ directory
+          # The wrapper scripts set up GDAL_DATA, PROJ_LIB, and PATH correctly
+          # We just need to unset any external environment variables to test true portability
           env -u CONDA_PREFIX -u CONDA_DEFAULT_ENV -u PYTHONPATH -u PROJ_LIB -u PROJ_DATA -u GDAL_DATA "${GITHUB_WORKSPACE}/smoke/relocated/geodepot/geodepot" --help
           rm -rf smoke/repo
           mkdir -p smoke/repo
@@ -162,6 +167,8 @@ jobs:
           Copy-Item -Recurse dist\geodepot smoke\relocated\geodepot
           Remove-Item -Recurse -Force smoke\repo -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force smoke\repo | Out-Null
+          # The bundle is now self-contained with env/ directory
+          # The wrapper scripts (cmd/ps1) set up GDAL_DATA, PROJ_LIB, and PATH correctly
           & "$env:GITHUB_WORKSPACE\smoke\relocated\geodepot\geodepot.cmd" --help
           Push-Location smoke\repo
           & "$env:GITHUB_WORKSPACE\smoke\relocated\geodepot\geodepot.cmd" init
@@ -174,7 +181,6 @@ jobs:
           cd dist
           zip -r "geodepot-${{ matrix.platform_id }}-${GEODEPOT_ARCH}.zip" geodepot
           sha256sum "geodepot-${{ matrix.platform_id }}-${GEODEPOT_ARCH}.zip" > "geodepot-${{ matrix.platform_id }}-${GEODEPOT_ARCH}.zip.sha256sum"
-          rm -rf geodepot environment.tar
 
       - if: runner.os == 'macOS'
         name: Create package archive macOS
@@ -182,7 +188,6 @@ jobs:
           cd dist
           zip -r "geodepot-${{ matrix.platform_id }}-${GEODEPOT_ARCH}.zip" geodepot
           shasum -a 256 "geodepot-${{ matrix.platform_id }}-${GEODEPOT_ARCH}.zip" > "geodepot-${{ matrix.platform_id }}-${GEODEPOT_ARCH}.zip.sha256sum"
-          rm -rf geodepot environment.tar
 
       - if: runner.os == 'Windows'
         name: Create package archive Windows
@@ -190,7 +195,6 @@ jobs:
           cd dist
           7z a "geodepot-${{ matrix.platform_id }}-${env:GEODEPOT_ARCH}.zip" geodepot
           certUtil -hashfile "geodepot-${{ matrix.platform_id }}-${env:GEODEPOT_ARCH}.zip" SHA256 > "geodepot-${{ matrix.platform_id }}-${env:GEODEPOT_ARCH}.zip.sha256sum"
-          Remove-Item -Recurse -Force geodepot, environment.tar
 
       - name: List contents
         run: ls dist

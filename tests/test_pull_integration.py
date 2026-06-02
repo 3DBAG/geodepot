@@ -131,9 +131,7 @@ def _seed_server_data_archive(
 
 
 @pytest.mark.integration
-def test_init_from_empty_remote(
-    tmp_path, monkeypatch, data_dir, mock_user_home
-):
+def test_init_from_empty_remote(tmp_path, monkeypatch, data_dir, mock_user_home):
     """Initialize from empty remote repository."""
     server_repo = data_dir / "integration" / "server_empty" / ".geodepot"
     server_repo.mkdir(parents=True, exist_ok=True)
@@ -143,9 +141,7 @@ def test_init_from_empty_remote(
     monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
     runner = CliRunner()
 
-    result = runner.invoke(
-        geodepot_grp, ["init", REMOTE_URL], catch_exceptions=False
-    )
+    result = runner.invoke(geodepot_grp, ["init", REMOTE_URL], catch_exceptions=False)
     assert result.exit_code == 0
     # Verify empty repo was created locally
     assert (tmp_path / ".geodepot").exists()
@@ -156,9 +152,7 @@ def test_init_from_empty_remote(
 
 
 @pytest.mark.integration
-def test_push_to_empty_remote(
-    tmp_path, monkeypatch, data_dir, mock_user_home
-):
+def test_push_to_empty_remote(tmp_path, monkeypatch, data_dir, mock_user_home):
     """Push to empty remote repository."""
     server_repo = data_dir / "integration" / "server_empty" / ".geodepot"
     _reset_server_repo(server_repo)
@@ -181,7 +175,9 @@ def test_push_to_empty_remote(
     assert result.exit_code == 0
 
     # Push to empty remote
-    result = runner.invoke(geodepot_grp, ["push", "-y", "origin"], catch_exceptions=False)
+    result = runner.invoke(
+        geodepot_grp, ["push", "-y", "origin"], catch_exceptions=False
+    )
     assert result.exit_code == 0
 
     # Verify data exists on server
@@ -195,9 +191,7 @@ def test_push_to_empty_remote(
 
 
 @pytest.mark.integration
-def test_pull_from_populated_remote(
-    tmp_path, monkeypatch, data_dir, mock_user_home
-):
+def test_pull_from_populated_remote(tmp_path, monkeypatch, data_dir, mock_user_home):
     """Pull from remote that has existing data."""
     server_repo = data_dir / "integration" / "server" / ".geodepot"
     _reset_server_repo(server_repo)
@@ -230,7 +224,9 @@ def test_pull_from_populated_remote(
     assert result.exit_code == 0
 
     # Pull from populated remote
-    result = runner.invoke(geodepot_grp, ["pull", "-y", "origin"], catch_exceptions=False)
+    result = runner.invoke(
+        geodepot_grp, ["pull", "-y", "origin"], catch_exceptions=False
+    )
     assert result.exit_code == 0
 
     # Verify both data items exist locally
@@ -277,7 +273,9 @@ def test_push_to_existing_remote_with_data(
     assert result.exit_code == 0
 
     # Push to existing remote (should add new case and data)
-    result = runner.invoke(geodepot_grp, ["push", "-y", "origin"], catch_exceptions=False)
+    result = runner.invoke(
+        geodepot_grp, ["push", "-y", "origin"], catch_exceptions=False
+    )
     assert result.exit_code == 0
 
     # Verify data exists on server
@@ -336,7 +334,9 @@ def test_two_users_contributing_to_same_remote(
         catch_exceptions=False,
     )
     assert result.exit_code == 0
-    result = runner.invoke(geodepot_grp, ["push", "-y", "origin"], catch_exceptions=False)
+    result = runner.invoke(
+        geodepot_grp, ["push", "-y", "origin"], catch_exceptions=False
+    )
     assert result.exit_code == 0
 
     # User 2: Clone and add different data to same case
@@ -350,9 +350,7 @@ def test_two_users_contributing_to_same_remote(
         json_module.dumps({"user": {"name": "User Two", "email": "user2@example.com"}})
     )
 
-    result = runner2.invoke(
-        geodepot_grp, ["init", REMOTE_URL], catch_exceptions=False
-    )
+    result = runner2.invoke(geodepot_grp, ["init", REMOTE_URL], catch_exceptions=False)
     assert result.exit_code == 0
     result = runner2.invoke(
         geodepot_grp,
@@ -362,7 +360,9 @@ def test_two_users_contributing_to_same_remote(
     assert result.exit_code == 0
 
     # User 2 pushes - should succeed, adding their data
-    result = runner2.invoke(geodepot_grp, ["push", "-y", "origin"], catch_exceptions=False)
+    result = runner2.invoke(
+        geodepot_grp, ["push", "-y", "origin"], catch_exceptions=False
+    )
     assert result.exit_code == 0
 
     # User 1 pulls - should see new data from User 2
@@ -371,7 +371,9 @@ def test_two_users_contributing_to_same_remote(
     assert result.exit_code == 0
     assert "User Two" in result.output  # Changed by other user
 
-    result = runner.invoke(geodepot_grp, ["pull", "-y", "origin"], catch_exceptions=False)
+    result = runner.invoke(
+        geodepot_grp, ["pull", "-y", "origin"], catch_exceptions=False
+    )
     assert result.exit_code == 0
 
     # Verify User 1 now has both data items
@@ -412,7 +414,9 @@ def test_conflict_detection_modified_same_data(
         ["add", "shared", str(data_dir / "sources" / "wippolder" / "wippolder.gpkg")],
         catch_exceptions=False,
     )
-    result = runner.invoke(geodepot_grp, ["push", "-y", "origin"], catch_exceptions=False)
+    result = runner.invoke(
+        geodepot_grp, ["push", "-y", "origin"], catch_exceptions=False
+    )
     assert result.exit_code == 0
 
     # User 2: Clone, modify same data
@@ -425,24 +429,21 @@ def test_conflict_detection_modified_same_data(
         json_module.dumps({"user": {"name": "User Two", "email": "user2@example.com"}})
     )
 
-    result = runner2.invoke(
-        geodepot_grp, ["init", REMOTE_URL], catch_exceptions=False
-    )
+    result = runner2.invoke(geodepot_grp, ["init", REMOTE_URL], catch_exceptions=False)
     assert result.exit_code == 0
 
     # User 2 modifies the description of the same data
     result = runner2.invoke(
         geodepot_grp,
-        [
-            "add", "shared/wippolder.gpkg",
-            "--description", "Modified by User 2"
-        ],
+        ["add", "shared/wippolder.gpkg", "--description", "Modified by User 2"],
         catch_exceptions=False,
     )
     assert result.exit_code == 0
 
     # User 2 pushes - should work
-    result = runner2.invoke(geodepot_grp, ["push", "-y", "origin"], catch_exceptions=False)
+    result = runner2.invoke(
+        geodepot_grp, ["push", "-y", "origin"], catch_exceptions=False
+    )
     assert result.exit_code == 0
 
     # User 1 fetches - should see modification by User 2
@@ -492,27 +493,32 @@ def test_push_to_existing_remote_updates_data(
         json_module.dumps({"user": {"name": "User One", "email": "user1@example.com"}})
     )
 
-    result = runner.invoke(
-        geodepot_grp, ["init", REMOTE_URL], catch_exceptions=False
-    )
+    result = runner.invoke(geodepot_grp, ["init", REMOTE_URL], catch_exceptions=False)
     assert result.exit_code == 0
 
     # User 1 adds another data item to the same case
     result = runner.invoke(
         geodepot_grp,
-        ["add", "shared_case", str(data_dir / "sources" / "wippolder" / "wippolder.las")],
+        [
+            "add",
+            "shared_case",
+            str(data_dir / "sources" / "wippolder" / "wippolder.las"),
+        ],
         catch_exceptions=False,
     )
     assert result.exit_code == 0
 
     # User 1 pushes the new data
-    result = runner.invoke(geodepot_grp, ["push", "-y", "origin"], catch_exceptions=False)
+    result = runner.invoke(
+        geodepot_grp, ["push", "-y", "origin"], catch_exceptions=False
+    )
     assert result.exit_code == 0
 
     # Verify both data items exist on server
     server_index = json.loads((server_repo / "index.geojson").read_text())
     shared_case_data = [
-        f for f in server_index["features"] 
+        f
+        for f in server_index["features"]
         if f["properties"]["case_name"] == "shared_case"
     ]
     assert len(shared_case_data) == 2
@@ -530,9 +536,7 @@ def test_push_to_existing_remote_updates_data(
         json_module.dumps({"user": {"name": "User Two", "email": "user2@example.com"}})
     )
 
-    result = runner2.invoke(
-        geodepot_grp, ["init", REMOTE_URL], catch_exceptions=False
-    )
+    result = runner2.invoke(geodepot_grp, ["init", REMOTE_URL], catch_exceptions=False)
     assert result.exit_code == 0
 
     # Verify User 2 has both data items
@@ -543,9 +547,7 @@ def test_push_to_existing_remote_updates_data(
 
 
 @pytest.mark.integration
-def test_pull_from_http_remote(
-    tmp_path, monkeypatch, mock_user_home
-):
+def test_pull_from_http_remote(tmp_path, monkeypatch, mock_user_home):
     """Test pull from HTTP remote (nginx server)."""
     monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
     runner = CliRunner()
@@ -575,12 +577,10 @@ def test_pull_from_http_remote(
 
 
 @pytest.mark.integration
-def test_push_to_existing_remote_repo(
-    tmp_path, monkeypatch, data_dir, mock_user_home
-):
+def test_push_to_existing_remote_repo(tmp_path, monkeypatch, data_dir, mock_user_home):
     """
     Test pushing data to an existing remote repository that already has data.
-    
+
     This test specifically verifies that:
     1. A client can clone from an existing remote
     2. Add new data locally
@@ -605,9 +605,7 @@ def test_push_to_existing_remote_repo(
     runner = CliRunner()
 
     # Client initializes from the existing remote
-    result = runner.invoke(
-        geodepot_grp, ["init", REMOTE_URL], catch_exceptions=False
-    )
+    result = runner.invoke(geodepot_grp, ["init", REMOTE_URL], catch_exceptions=False)
     assert result.exit_code == 0
 
     # Verify the initial data is available locally
@@ -624,7 +622,9 @@ def test_push_to_existing_remote_repo(
     assert result.exit_code == 0
 
     # Client pushes the new data to the existing remote
-    result = runner.invoke(geodepot_grp, ["push", "-y", "origin"], catch_exceptions=False)
+    result = runner.invoke(
+        geodepot_grp, ["push", "-y", "origin"], catch_exceptions=False
+    )
     assert result.exit_code == 0
 
     # Verify both cases exist on the server
@@ -648,9 +648,7 @@ def test_push_to_existing_remote_repo(
     monkeypatch.setattr(Path, "cwd", lambda: client2_dir)
     runner2 = CliRunner()
 
-    result = runner2.invoke(
-        geodepot_grp, ["init", REMOTE_URL], catch_exceptions=False
-    )
+    result = runner2.invoke(geodepot_grp, ["init", REMOTE_URL], catch_exceptions=False)
     assert result.exit_code == 0
 
     # Verify client2 has both cases

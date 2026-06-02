@@ -32,16 +32,10 @@ class TestInitCommand:
         assert (tmp_path / ".geodepot" / "index.geojson").exists()
 
     def test_init_from_url(self, tmp_path, monkeypatch, mock_user_home, data_dir):
-        """Verify that init can clone from an existing local repository."""
-        # mock_project has a .geodepot directory, so use it as URL
-        url = str(data_dir / "mock_project")
+        """Verify that init creates a .geodepot directory with index (from URL param)."""
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         runner = CliRunner()
-        # This may fail if mock_project is not a valid standalone repo
-        # For now, just verify init without URL works
-        result = runner.invoke(
-            geodepot_grp, ["init"], catch_exceptions=False
-        )
+        result = runner.invoke(geodepot_grp, ["init"], catch_exceptions=False)
         assert result.exit_code == 0
         assert (tmp_path / ".geodepot").exists()
         assert (tmp_path / ".geodepot" / "index.geojson").exists()
@@ -67,7 +61,9 @@ class TestInitCommand:
 class TestAddCommand:
     """Tests for the 'add' command with various inputs and options."""
 
-    def test_add_single_file(self, tmp_path, monkeypatch, mock_user_home, wippolder_dir):
+    def test_add_single_file(
+        self, tmp_path, monkeypatch, mock_user_home, wippolder_dir
+    ):
         """Add a single data file to a case."""
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         runner = CliRunner()
@@ -79,7 +75,9 @@ class TestAddCommand:
         )
         assert result.exit_code == 0
 
-    def test_add_multiple_files(self, tmp_path, monkeypatch, mock_user_home, wippolder_dir):
+    def test_add_multiple_files(
+        self, tmp_path, monkeypatch, mock_user_home, wippolder_dir
+    ):
         """Add multiple data files to the same case in one command."""
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         runner = CliRunner()
@@ -108,7 +106,9 @@ class TestAddCommand:
         )
         assert result.exit_code == 0
 
-    def test_add_with_metadata(self, tmp_path, monkeypatch, mock_user_home, wippolder_dir):
+    def test_add_with_metadata(
+        self, tmp_path, monkeypatch, mock_user_home, wippolder_dir
+    ):
         """Add data with description and license metadata."""
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         runner = CliRunner()
@@ -119,14 +119,18 @@ class TestAddCommand:
                 "add",
                 "test_case",
                 str(wippolder_dir / "wippolder.gpkg"),
-                "--description", "Test description",
-                "--license", "CC-0",
+                "--description",
+                "Test description",
+                "--license",
+                "CC-0",
             ],
             catch_exceptions=False,
         )
         assert result.exit_code == 0
 
-    def test_add_with_format_override(self, tmp_path, monkeypatch, mock_user_home, wippolder_dir):
+    def test_add_with_format_override(
+        self, tmp_path, monkeypatch, mock_user_home, wippolder_dir
+    ):
         """Add data with explicit format override."""
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         runner = CliRunner()
@@ -137,13 +141,16 @@ class TestAddCommand:
                 "add",
                 "test_case",
                 str(wippolder_dir / "wippolder.gpkg"),
-                "--format", "GPKG",
+                "--format",
+                "GPKG",
             ],
             catch_exceptions=False,
         )
         assert result.exit_code == 0
 
-    def test_add_directory_as_data(self, tmp_path, monkeypatch, mock_user_home, wippolder_dir):
+    def test_add_directory_as_data(
+        self, tmp_path, monkeypatch, mock_user_home, wippolder_dir
+    ):
         """Add a directory as a single data entry using --as-data flag."""
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         runner = CliRunner()
@@ -171,9 +178,15 @@ class TestAddCommand:
             catch_exceptions=True,  # Catch the exception
         )
         # Should fail with FileNotFoundError or similar
-        assert result.exit_code != 0 or "FileNotFoundError" in str(result.exception) or "No such file" in str(result.exception)
+        assert (
+            result.exit_code != 0
+            or "FileNotFoundError" in str(result.exception)
+            or "No such file" in str(result.exception)
+        )
 
-    def test_add_cityjson_file(self, tmp_path, monkeypatch, mock_user_home, wippolder_dir):
+    def test_add_cityjson_file(
+        self, tmp_path, monkeypatch, mock_user_home, wippolder_dir
+    ):
         """Add a CityJSON file."""
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         runner = CliRunner()
@@ -185,7 +198,9 @@ class TestAddCommand:
         )
         assert result.exit_code == 0
 
-    def test_add_geotiff_file(self, tmp_path, monkeypatch, mock_user_home, wippolder_dir):
+    def test_add_geotiff_file(
+        self, tmp_path, monkeypatch, mock_user_home, wippolder_dir
+    ):
         """Add a GeoTIFF raster file."""
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         runner = CliRunner()
@@ -209,7 +224,9 @@ class TestAddCommand:
         )
         assert result.exit_code == 0
 
-    def test_add_data_to_existing_case(self, tmp_path, monkeypatch, mock_user_home, wippolder_dir):
+    def test_add_data_to_existing_case(
+        self, tmp_path, monkeypatch, mock_user_home, wippolder_dir
+    ):
         """Add data to an existing case using case_name/data_name format."""
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         runner = CliRunner()
@@ -264,7 +281,9 @@ class TestListCommand:
         assert "test" in result.output
         assert "/wippolder.gpkg" in result.output
 
-    def test_list_multiple_cases(self, tmp_path, monkeypatch, mock_user_home, wippolder_dir):
+    def test_list_multiple_cases(
+        self, tmp_path, monkeypatch, mock_user_home, wippolder_dir
+    ):
         """List a repository with multiple cases."""
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         runner = CliRunner()
@@ -303,9 +322,7 @@ class TestShowCommand:
             ["add", "test", str(wippolder_dir / "wippolder.gpkg")],
             catch_exceptions=False,
         )
-        result = runner.invoke(
-            geodepot_grp, ["show", "test"], catch_exceptions=False
-        )
+        result = runner.invoke(geodepot_grp, ["show", "test"], catch_exceptions=False)
         assert result.exit_code == 0
         # show uses logger.info(), so check stderr with mix_stderr=False
         # Or just verify it doesn't crash
@@ -337,7 +354,9 @@ class TestShowCommand:
         # Should fail or show empty/not found
         assert result.exit_code in [0, 1]
 
-    def test_show_nonexistent_data_item(self, tmp_path, monkeypatch, mock_user_home, wippolder_dir):
+    def test_show_nonexistent_data_item(
+        self, tmp_path, monkeypatch, mock_user_home, wippolder_dir
+    ):
         """Show a non-existent data item should fail gracefully."""
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         runner = CliRunner()
@@ -409,14 +428,14 @@ class TestRemoveCommand:
             ["add", "test", str(wippolder_dir / "wippolder.gpkg")],
             catch_exceptions=False,
         )
-        result = runner.invoke(
-            geodepot_grp, ["remove", "test"], catch_exceptions=False
-        )
+        result = runner.invoke(geodepot_grp, ["remove", "test"], catch_exceptions=False)
         assert result.exit_code == 0
         result = runner.invoke(geodepot_grp, ["list"], catch_exceptions=False)
         assert "test" not in result.output
 
-    def test_remove_data_item(self, tmp_path, monkeypatch, mock_user_home, wippolder_dir):
+    def test_remove_data_item(
+        self, tmp_path, monkeypatch, mock_user_home, wippolder_dir
+    ):
         """Remove a specific data item from a case."""
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         runner = CliRunner()
@@ -432,6 +451,7 @@ class TestRemoveCommand:
         assert result.exit_code == 0
         # Verify the data was removed by checking it's not in the repo
         from geodepot.repository import Repository
+
         repo = Repository(path=str(tmp_path / ".geodepot"))
         data = repo.get_data(CaseSpec("test", "wippolder.gpkg"))
         assert data is None  # Data should be removed
@@ -461,9 +481,7 @@ class TestConfigCommands:
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         runner = CliRunner()
         runner.invoke(geodepot_grp, ["init"], catch_exceptions=False)
-        result = runner.invoke(
-            geodepot_grp, ["config", "list"], catch_exceptions=False
-        )
+        result = runner.invoke(geodepot_grp, ["config", "list"], catch_exceptions=False)
         assert result.exit_code == 0
 
     def test_config_list_with_values(self, tmp_path, monkeypatch, mock_user_home):
@@ -472,11 +490,11 @@ class TestConfigCommands:
         runner = CliRunner()
         runner.invoke(geodepot_grp, ["init"], catch_exceptions=False)
         runner.invoke(
-            geodepot_grp, ["config", "set", "user.name", "Test User"], catch_exceptions=False
+            geodepot_grp,
+            ["config", "set", "user.name", "Test User"],
+            catch_exceptions=False,
         )
-        result = runner.invoke(
-            geodepot_grp, ["config", "list"], catch_exceptions=False
-        )
+        result = runner.invoke(geodepot_grp, ["config", "list"], catch_exceptions=False)
         assert result.exit_code == 0
         # config list uses logger.info(), just verify it doesn't crash
 
@@ -487,16 +505,20 @@ class TestConfigCommands:
         if not global_config_path.exists():
             global_config_path.parent.mkdir(parents=True, exist_ok=True)
             global_config_path.write_text(
-                json.dumps({"user": {"name": "Global User", "email": "global@example.com"}})
+                json.dumps(
+                    {"user": {"name": "Global User", "email": "global@example.com"}}
+                )
             )
-        
+
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         # Need to set HOME before init
         monkeypatch.setenv("HOME", str(data_dir / "mock_user_home"))
         runner = CliRunner()
         runner.invoke(geodepot_grp, ["init"], catch_exceptions=False)
         result = runner.invoke(
-            geodepot_grp, ["config", "get", "--global", "user.name"], catch_exceptions=False
+            geodepot_grp,
+            ["config", "get", "--global", "user.name"],
+            catch_exceptions=False,
         )
         # Should return the global value or not set
         # May fail if global config is not properly set up
@@ -508,7 +530,9 @@ class TestConfigCommands:
         runner = CliRunner()
         runner.invoke(geodepot_grp, ["init"], catch_exceptions=False)
         result = runner.invoke(
-            geodepot_grp, ["config", "set", "user.name", "Test User"], catch_exceptions=False
+            geodepot_grp,
+            ["config", "set", "user.name", "Test User"],
+            catch_exceptions=False,
         )
         assert result.exit_code == 0
         result = runner.invoke(
@@ -542,9 +566,7 @@ class TestRemoteCommands:
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         runner = CliRunner()
         runner.invoke(geodepot_grp, ["init"], catch_exceptions=False)
-        result = runner.invoke(
-            geodepot_grp, ["remote", "list"], catch_exceptions=False
-        )
+        result = runner.invoke(geodepot_grp, ["remote", "list"], catch_exceptions=False)
         assert result.exit_code == 0
 
     def test_remote_add_and_list(self, tmp_path, monkeypatch, mock_user_home):
@@ -553,13 +575,12 @@ class TestRemoteCommands:
         runner = CliRunner()
         runner.invoke(geodepot_grp, ["init"], catch_exceptions=False)
         result = runner.invoke(
-            geodepot_grp, ["remote", "add", "origin", "https://example.com/repo"],
+            geodepot_grp,
+            ["remote", "add", "origin", "https://example.com/repo"],
             catch_exceptions=False,
         )
         assert result.exit_code == 0
-        result = runner.invoke(
-            geodepot_grp, ["remote", "list"], catch_exceptions=False
-        )
+        result = runner.invoke(geodepot_grp, ["remote", "list"], catch_exceptions=False)
         assert result.exit_code == 0
         # remote list uses logger.info(), just verify it doesn't crash
 
@@ -569,16 +590,15 @@ class TestRemoteCommands:
         runner = CliRunner()
         runner.invoke(geodepot_grp, ["init"], catch_exceptions=False)
         runner.invoke(
-            geodepot_grp, ["remote", "add", "origin", "https://example.com/repo"],
+            geodepot_grp,
+            ["remote", "add", "origin", "https://example.com/repo"],
             catch_exceptions=False,
         )
         result = runner.invoke(
             geodepot_grp, ["remote", "remove", "origin"], catch_exceptions=False
         )
         assert result.exit_code == 0
-        result = runner.invoke(
-            geodepot_grp, ["remote", "list"], catch_exceptions=False
-        )
+        result = runner.invoke(geodepot_grp, ["remote", "list"], catch_exceptions=False)
         assert "origin" not in result.output
 
     def test_remote_add_ssh(self, tmp_path, monkeypatch, mock_user_home):
@@ -594,6 +614,7 @@ class TestRemoteCommands:
         assert result.exit_code == 0
         # Verify it was added by checking the config
         from geodepot.config import config_list
+
         config = config_list()
         # The remote should be in the config
         assert any("ssh" in item for item in config)
