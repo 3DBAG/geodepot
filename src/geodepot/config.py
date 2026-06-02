@@ -78,7 +78,7 @@ class Remote:
             ssh_host = ssh_parts
             self.path = None
             self.ssh_port = None
-            
+
             # First, check if there's a path component
             # SSH/SFTP URLs can be: ssh://host, ssh://host:port, ssh://host/path, ssh://host:port/path, ssh://user@host/path, etc.
             if "/" in ssh_parts:
@@ -86,11 +86,11 @@ class Remote:
                 host_port_part, path_part = ssh_parts.split("/", 1)
                 self.path = "/" + path_part  # Keep the leading /
                 ssh_host = host_port_part
-            
+
             # Now parse host and port from ssh_host
             # Remove trailing colon if present (e.g., "some.server:")
             ssh_host = ssh_host.rstrip(":")
-            
+
             if ":" in ssh_host:
                 # Check if the part after last : is a digit (port)
                 parts = ssh_host.rsplit(":", 1)
@@ -99,7 +99,7 @@ class Remote:
                     ssh_host = parts[0]
                     self.ssh_port = int(parts[1])
                 # else: the : is part of the hostname (e.g., IPv6 or user@host)
-            
+
             self.ssh_host = ssh_host
             self.is_ssh = True
             if self.ssh_host is None:
@@ -295,10 +295,10 @@ config_encoder = multiencoder_factory(DataClassEncoder)
 
 def get_global_config_path(create_if_missing: bool = False) -> Path | None:
     """Get the path to the global configuration file.
-    
+
     Args:
         create_if_missing: If True, create the global config file if it doesn't exist.
-        
+
     Returns:
         Path to the global config file, or None if it doesn't exist and create_if_missing is False.
     """
@@ -307,7 +307,9 @@ def get_global_config_path(create_if_missing: bool = False) -> Path | None:
         logger.debug("Resolved global config path: %s", global_config_path)
         return global_config_path
     if create_if_missing:
-        logger.debug("Creating global config directory and file at %s", global_config_path)
+        logger.debug(
+            "Creating global config directory and file at %s", global_config_path
+        )
         global_config_path.parent.mkdir(parents=True, exist_ok=True)
         # Create an empty config file
         Config().write(global_config_path)
