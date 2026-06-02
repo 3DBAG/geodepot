@@ -1020,14 +1020,10 @@ class Repository:
             archive_path_remote = _remote_data_archive_path(remote, data)
             local_archive = _local_data_archive_path(self.path_cases, data)
             local_archive.parent.mkdir(parents=True, exist_ok=True)
-            logger.debug(
-                "Downloading %s from %s to %s",
-                data,
-                archive_path_remote,
-                local_archive,
-            )
+            logger.info("Downloading %s...", data)
             _ = conn_ssh.get(local=str(local_archive), remote=archive_path_remote)
             self._decompress_data(local_archive, data)
+            logger.info("Downloaded %s", data)
 
         def remote_data_specs(case_spec: CaseSpec) -> list[CaseSpec]:
             if self.index_remote is None:
@@ -1096,7 +1092,7 @@ class Repository:
             )
 
         try:
-            logger.debug(f"GET local={self.path_index}, remote={remote.path_index}")
+            logger.info(f"Downloading {GEODEPOT_INDEX} from {remote_name}...")
             _ = conn_ssh.get(local=str(self.path_index), remote=str(remote.path_index))
             logger.info(f"Downloaded {GEODEPOT_INDEX} from {remote_name}")
         except Exception as e:
@@ -1155,13 +1151,7 @@ class Repository:
         def upload_data_archive(data: CaseSpec) -> None:
             archive_path_local = _local_data_archive_path(self.path_cases, data)
             archive_path_remote = _remote_data_archive_path(remote, data)
-            logger.debug(
-                "Uploading %s from %s to %s",
-                data,
-                archive_path_local,
-                archive_path_remote,
-            )
-            logger.debug(f"PUT local={archive_path_local} remote={archive_path_remote}")
+            logger.info("Uploading %s...", data)
             _ = conn_ssh.put(local=archive_path_local, remote=archive_path_remote)
             logger.info(f"Uploaded {data} to {remote.name}")
 
@@ -1273,7 +1263,7 @@ class Repository:
             )
 
         try:
-            logger.debug(f"PUT local={self.path_index}, remote={remote.path_index}")
+            logger.info(f"Uploading {GEODEPOT_INDEX} to {remote.name}...")
             _ = conn_ssh.put(self.path_index, remote=remote.path_index)
             logger.info(f"Transferred {GEODEPOT_INDEX} to {remote.name}")
         except Exception as e:
