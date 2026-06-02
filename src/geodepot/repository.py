@@ -515,7 +515,6 @@ class Repository:
                     raise GeodepotRuntimeError(
                         "Geodepot does not support creating remote repositories (cannot set 'path' to a URL and 'create=True')."
                     )
-                from requests import get as requests_get
 
                 path_local = Path.cwd() / ".geodepot"
                 if path_local.is_dir():
@@ -524,24 +523,94 @@ class Repository:
                     )
                 else:
                     path_local.joinpath(GEODEPOT_CASES).mkdir(parents=True)
-                url_root = urlparse(path).geturl()
+
+                url_parsed = urlparse(path)
+                url_root = url_parsed.geturl()
                 logger.debug(
                     "Initializing repository from remote source with scheme=%s",
-                    urlparse(url_root).scheme,
+                    url_parsed.scheme,
                 )
-                # Download existing repository
-                response = requests_get("/".join([url_root, GEODEPOT_INDEX]))
-                response.raise_for_status()
-                path_local.joinpath(GEODEPOT_INDEX).write_bytes(response.content)
-                response = requests_get("/".join([url_root, GEODEPOT_CONFIG_LOCAL]))
-                response.raise_for_status()
-                config = Config.from_json(response.content)
-                if "origin" not in config.remotes:
-                    remote_origin = Remote(name="origin", url=url_root)
-                    config.remotes["origin"] = remote_origin
-                    config.write(path_local.joinpath(GEODEPOT_CONFIG_LOCAL))
-                    logger.debug("Added remote origin to config.remotes")
-                self._load_from_path(path_local)
+
+                # Handle different URL schemes
+                if url_parsed.scheme in ('http', 'https'):
+                    # Use requests for HTTP/HTTPS
+                    from requests import get as requests_get
+                    
+                    # Download existing repository
+                    response = requests_get("/".join([url_root, GEODEPOT_INDEX]))
+                    response.raise_for_status()
+                    path_local.joinpath(GEODEPOT_INDEX).write_bytes(response.content)
+                    response = requests_get("/".join([url_root, GEODEPOT_CONFIG_LOCAL]))
+                    response.raise_for_status()
+                    config = Config.from_json(response.content)
+                    if "origin" not in config.remotes:
+                        remote_origin = Remote(name="origin", url=url_root)
+                        config.remotes["origin"] = remote_origin
+                        config.write(path_local.joinpath(GEODEPOT_CONFIG_LOCAL))
+                        logger.debug("Added remote origin to config.remotes")
+                    self._load_from_path(path_local)
+
+                elif url_parsed.scheme in ('ssh', 'sftp'):
+                    # Use fabric/SSH for SSH/SFTP URLs
+                    from fabric import Connection
+                    
+                    # Parse the SSH URL to extract components
+                    # The Remote class already has good parsing logic, so use it
+                    temp_remote = Remote(name="temp_init", url=path)
+                    
+                    # Create SSH connection
+                    conn = _ssh_connection(temp_remote)
+                    
+                    # Download index file via SFTP
+                    try:
+                        local_index_path = path_local / GEODEPOT_INDEX
+                        result = conn.get(
+                            remote=str(temp_remote.path_index),
+                            local=str(local_index_path)
+                        )
+                        logger.debug("Downloaded index from %s to %s", temp_remote.path_index, local_index_path)
+                    except Exception as e:
+                        raise GeodepotRuntimeError(
+                            f"Failed to download {GEODEPOT_INDEX} from {path}: {e}"
+                        ) from e
+                    
+                    # Download config file via SFTP
+                    try:
+                        local_config_path = path_local / GEODEPOT_CONFIG_LOCAL
+                        result = conn.get(
+                            remote=str(temp_remote.path_config),
+                            local=str(local_config_path)
+                        )
+                        logger.debug("Downloaded config from %s to %s", temp_remote.path_config, local_config_path)
+                    except Exception as e:
+                        # Try alternative path - config might be at the root
+                        try:
+                            local_config_path = path_local / GEODEPOT_CONFIG_LOCAL
+                            result = conn.get(
+                                remote=str('/'.join([urlparse(path).path.rstrip('/'), GEODEPOT_CONFIG_LOCAL])),
+                                local=str(local_config_path)
+                            )
+                        except Exception as e2:
+                            raise GeodepotRuntimeError(
+                                f"Failed to download {GEODEPOT_CONFIG_LOCAL} from {path}: {e}"
+                            ) from e2
+                    
+                    # Load the config and add remote if needed
+                    config = Config.load(local_config_path)
+                    if "origin" not in (config.remotes or {}):
+                        remote_origin = Remote(name="origin", url=path)
+                        config.remotes = config.remotes or {}
+                        config.remotes["origin"] = remote_origin
+                        config.write(local_config_path)
+                        logger.debug("Added remote origin to config.remotes")
+                    
+                    self._load_from_path(path_local)
+
+                else:
+                    raise GeodepotRuntimeError(
+                        f"Unsupported URL scheme '{url_parsed.scheme}' for remote initialization. "
+                        f"Supported schemes: http, https, ssh, sftp"
+                    )
             else:
                 p = Path(path).resolve()
                 if p.is_dir() and p.name == ".geodepot":
