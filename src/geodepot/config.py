@@ -66,26 +66,44 @@ class Remote:
         self.path = None
         #: The SSH user@host if the protocol is SSH/SFTP
         self.ssh_host = None
+        #: The SSH port if the protocol is SSH/SFTP and the URL includes one
+        self.ssh_port = None
 
         ssh_parts = None
         if self.url.startswith("ssh://"):
-            ssh_parts = self.url.removeprefix("ssh://").split(":")
+            ssh_parts = self.url.removeprefix("ssh://")
         elif self.url.startswith("sftp://"):
-            ssh_parts = self.url.removeprefix("sftp://").split(":")
+            ssh_parts = self.url.removeprefix("sftp://")
         if ssh_parts is not None:
-            if len(ssh_parts) == 2:
-                self.ssh_host = ssh_parts[0]
-                self.path = ssh_parts[1]
-            elif len(ssh_parts) == 1:
-                self.ssh_host = ssh_parts[0]
-                logger.error(
-                    f"Expected a remote URL in the form of ssh[sftp]://<url>:<path>, but did not find :<path> in {self.url}."
-                )
-            else:
-                raise GeodepotInvalidConfiguration(
-                    f"Expected a remote URL in the form of ssh[sftp]://<url>:<path>, but found {self.url}."
-                )
+            ssh_host = ssh_parts
+            self.path = None
+            self.ssh_port = None
+
+            # First, check if there's a path component
+            # SSH/SFTP URLs can be: ssh://host, ssh://host:port, ssh://host/path, ssh://host:port/path, ssh://user@host/path, etc.
+            if "/" in ssh_parts:
+                # There's a path, split on the first / to separate host:port from path
+                host_port_part, path_part = ssh_parts.split("/", 1)
+                self.path = "/" + path_part  # Keep the leading /
+                ssh_host = host_port_part
+
+            # Now parse host and port from ssh_host
+            # Remove trailing colon if present (e.g., "some.server:")
+            ssh_host = ssh_host.rstrip(":")
+
+            if ":" in ssh_host:
+                # Check if the part after last : is a digit (port)
+                parts = ssh_host.rsplit(":", 1)
+                if parts[1].isdigit():
+                    # Last part is a port number
+                    ssh_host = parts[0]
+                    self.ssh_port = int(parts[1])
+                # else: the : is part of the hostname (e.g., IPv6 or user@host)
+
+            self.ssh_host = ssh_host
             self.is_ssh = True
+            if self.ssh_host is None:
+                raise ValueError(f"Could not set Remote ssh_host from {self.url}")
             if self.ssh_host is None:
                 raise ValueError(f"Could not set Remote ssh_host from {self.url}")
 
@@ -122,6 +140,20 @@ class Remote:
         else:
             return "/".join([self.url, GEODEPOT_CASES])
 
+    @property
+    def path_config(self):
+        """Path to the remote config file. If the remote is SSH, then this is the
+        path on the remote filesystem. If the remote is HTTP, then this is the URL with
+        the config file name."""
+        if self.is_ssh:
+            return (
+                "/".join([self.path, GEODEPOT_CONFIG_LOCAL])
+                if self.path is not None
+                else GEODEPOT_CONFIG_LOCAL
+            )
+        else:
+            return "/".join([self.url, GEODEPOT_CONFIG_LOCAL])
+
     def to_json(self) -> str:
         """Serialize the remote to a JSON string."""
         return dumps(self, cls=DataClassEncoder, indent=JSON_INDENT)
@@ -148,11 +180,18 @@ class Config:
                 # An empty config is serialized as an empty JSON object '{}', so the
                 # deserializer 'as_config' will return a dict and not an empty Config
                 # instance.
-                return (
+                config = (
                     c
                     if not isinstance(c, dict)
                     else Config(user=User(), remotes=dict())
                 )
+                logger.debug(
+                    "Loaded config from %s: has_user=%s remote_count=%s",
+                    path,
+                    config.user is not None,
+                    0 if config.remotes is None else len(config.remotes),
+                )
+                return config
         except (FileNotFoundError, JSONDecodeError) as e:
             raise GeodepotInvalidConfiguration(
                 f"Failed to load configuration from {path}"
@@ -161,6 +200,12 @@ class Config:
     def write(self, path: Path) -> None:
         logger.debug(f"Writing config to file: {path}")
         path.write_text(self.to_json())
+        logger.debug(
+            "Wrote config to %s: has_user=%s remote_count=%s",
+            path,
+            self.user is not None,
+            0 if self.remotes is None else len(self.remotes),
+        )
 
     @classmethod
     def from_json(cls, json_str) -> Self:
@@ -177,12 +222,14 @@ class Config:
             self.remotes = other.remotes
 
     def add_remote(self, name: str, url: str):
+        logger.debug("Config.add_remote: name=%s", name)
         if self.remotes is None:
             self.remotes = {name: Remote(name=name, url=url)}
         else:
             self.remotes[name] = Remote(name=name, url=url)
 
     def remove_remote(self, name: str):
+        logger.debug("Config.remove_remote: name=%s", name)
         del self.remotes[name]
 
     def to_pretty_lines(self) -> list[str]:
@@ -246,26 +293,51 @@ def multiencoder_factory(*encoders):
 config_encoder = multiencoder_factory(DataClassEncoder)
 
 
-def get_global_config_path() -> Path | None:
-    if (global_config_path := Path.home() / GEODEPOT_CONFIG_GLOBAL).exists():
+def get_global_config_path(create_if_missing: bool = False) -> Path | None:
+    """Get the path to the global configuration file.
+
+    Args:
+        create_if_missing: If True, create the global config file if it doesn't exist.
+
+    Returns:
+        Path to the global config file, or None if it doesn't exist and create_if_missing is False.
+    """
+    global_config_path = Path.home() / GEODEPOT_CONFIG_GLOBAL
+    if global_config_path.exists():
+        logger.debug("Resolved global config path: %s", global_config_path)
         return global_config_path
+    if create_if_missing:
+        logger.debug(
+            "Creating global config directory and file at %s", global_config_path
+        )
+        global_config_path.parent.mkdir(parents=True, exist_ok=True)
+        # Create an empty config file
+        Config().write(global_config_path)
+        return global_config_path
+    logger.debug("Global config path does not exist under the current home directory")
+    return None
 
 
 def get_global_config() -> Config | None:
     if (global_config_path := get_global_config_path()) is not None:
+        logger.debug("Loading global configuration from %s", global_config_path)
         return Config.load(global_config_path)
 
 
 def get_local_config_path() -> Path | None:
     if (local_config_path := Path.cwd() / ".geodepot" / GEODEPOT_CONFIG_LOCAL).exists():
+        logger.debug("Resolved local config path: %s", local_config_path)
         return local_config_path
+    logger.debug("Local config path does not exist in the current repository")
 
 
 def get_local_config(path: Path | None = None) -> Config | None:
     if path is None:
         if (local_config_path := get_local_config_path()) is not None:
+            logger.debug("Loading local configuration from %s", local_config_path)
             return Config.load(local_config_path)
     else:
+        logger.debug("Loading local configuration from explicit path %s", path)
         return Config.load(path)
 
 
@@ -285,11 +357,17 @@ def get_config(local_config: Path | None = None) -> Config:
     config = config if config is not None else Config()
     local_config = local_config if local_config is not None else Config()
     config.update(local_config)
+    logger.debug(
+        "Merged configuration: has_user=%s has_remotes=%s",
+        config.user is not None,
+        config.remotes is not None,
+    )
     return config
 
 
 def get_current_user() -> User | None:
     config = get_config()
+    logger.debug("Resolved current user: %s", "present" if config.user else "none")
     return config.user
 
 
@@ -298,6 +376,7 @@ def configure(
 ) -> str | None:
     """Get or set configuration values."""
     config = get_global_config() if global_config else get_local_config()
+    logger.debug("Config access: key=%s global=%s", key, global_config)
     section, variable = key.split(".", 1)
     try:
         sec_val = getattr(config, section)
@@ -306,18 +385,32 @@ def configure(
         logger.error(f"Invalid configuration key: {key}")
         return None
     if value is None:
+        logger.debug("Read configuration value for %s.%s", section, variable)
         return var_val
     else:
         setattr(sec_val, variable, value)
-        logger.debug(f"Set {key} to {value} (global={global_config})")
-    config_path = get_global_config_path() if global_config else get_local_config_path()
-    config.write(config_path)
+        logger.debug("Set configuration key %s (global=%s)", key, global_config)
+        # Only write when setting a value (not when reading)
+        if global_config:
+            # When setting a global config value, create the file if it doesn't exist
+            config_path = get_global_config_path(create_if_missing=True)
+        else:
+            config_path = get_local_config_path()
+        if config_path is not None:
+            config.write(config_path)
+        else:
+            logger.error("Could not determine config path to write")
 
 
 def config_list() -> list[str]:
     output = []
     config_global = get_global_config()
     config_local = get_local_config()
+    logger.debug(
+        "Listing configuration values: global=%s local=%s",
+        config_global is not None,
+        config_local is not None,
+    )
     if config_global is not None:
         for line in config_global.to_pretty_lines():
             output.append(f"[global] {line}")
@@ -330,6 +423,7 @@ def config_list() -> list[str]:
 def remote_list() -> list[str]:
     output = []
     config = get_config()
+    logger.debug("Listing remotes")
     if config is not None and config.remotes is not None:
         for k, v in config.remotes.items():
             output.append(f"{k} {v.url}")
@@ -342,6 +436,7 @@ def remote_add(name: str, url: str):
         raise GeodepotInvalidConfiguration(
             "No local configuration found. Run 'geodepot init' first."
         )
+    logger.debug("Adding remote %s to local configuration", name)
     config.add_remote(name, url)
     config.write(get_local_config_path())
 
@@ -352,5 +447,6 @@ def remote_remove(name: str):
         raise GeodepotInvalidConfiguration(
             "No local configuration found. Run 'geodepot init' first."
         )
+    logger.debug("Removing remote %s from local configuration", name)
     config.remove_remote(name)
     config.write(get_local_config_path())

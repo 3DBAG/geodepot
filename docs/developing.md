@@ -6,24 +6,39 @@ This page covers setting up a development environment, running tests, and the re
 
 - [Pixi](https://pixi.sh/) for environment and dependency management
 - [just](https://just.systems/) as the task runner (thin wrapper around `pixi run`)
-- Docker (for integration tests)
+- Docker or Podman (for integration tests)
 - Git
 
-## Development Setup
+## Quickstart
 
-Install the development environment:
+Set up the local development environment:
 
 ```shell
+git clone https://github.com/3DGI/geodepot.git
+cd geodepot
+cp .env.example .env
 pixi install -e dev
+just download-data
+just test
 ```
 
-All development tasks are run through `just`:
+The default `.env.example` comments assume Docker. If you use rootless Podman,
+edit `.env` and enable:
+
+```shell
+GEODEPOT_COMPOSE="podman compose"
+GEODEPOT_CONTAINER_SOCKET="${XDG_RUNTIME_DIR}/podman/podman.sock"
+```
+
+All development tasks are run through `just`. `just` automatically loads the
+repo-local `.env` file:
 
 ```shell
 just lint          # Lint code with ruff
 just format        # Auto-format code with ruff
 just format-check  # Check formatting without modifying
-just test          # Run all tests with pytest
+just test          # Run unit tests with pytest
+just integration-test  # Run container-backed integration tests
 just docs-build    # Build mkdocs locally
 just docs-deploy   # Deploy docs to GitHub Pages
 ```
@@ -48,18 +63,39 @@ This populates `tests/data/` with spatial datasets used by the test suite.
 
 ## Integration Tests
 
-Integration tests (`test_repository_collaboration.py`) use a Docker-based test server
-that provides HTTP and SSH endpoints:
+Integration tests use a containerized test server that provides HTTP and SSH endpoints.
+The default unit suite excludes these tests; run them explicitly with:
 
 ```shell
-just up    # Start nginx + sshd containers
-just down  # Stop containers
+just integration-test
 ```
 
 The test server exposes:
 
 - **HTTP**: `http://localhost:8080/geodepot` (pull/fetch operations)
-- **SSH/SFTP**: `ssh://root@localhost:2222:/srv/geodepot` (push operations, uses `~/.ssh/id_rsa.pub`)
+- **SSH/SFTP**: `ssh://root@localhost:2222:/srv/geodepot` (push operations)
+
+The recipes use the compose command configured in `.env`:
+
+- Docker: `GEODEPOT_COMPOSE="docker compose"` or leave it unset
+- Podman: `GEODEPOT_COMPOSE="podman compose"`
+
+When running from a devcontainer, the devcontainer talks to the host container
+engine through a Docker-compatible socket. Set `GEODEPOT_CONTAINER_SOCKET` in
+`.env`, then launch the IDE from a shell that exports those values before
+creating or rebuilding the devcontainer:
+
+```shell
+set -a
+. ./.env
+set +a
+pycharm .
+```
+
+The devcontainer mounts that socket as `/var/run/docker.sock` and uses the
+Docker CLI/Compose plugin as the common client. For rootless Podman-backed
+devcontainers, the configuration also uses `--userns=keep-id` so bind-mounted
+workspace files remain writable by the `vscode` user.
 
 ## Branch Strategy
 

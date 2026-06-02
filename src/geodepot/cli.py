@@ -1,13 +1,15 @@
-from logging import getLogger, basicConfig, DEBUG, INFO
+import logging
+from logging import DEBUG, INFO, Formatter, StreamHandler, getLogger
+import sys
 
 from click import (
-    group,
-    command,
-    pass_context,
-    option,
-    version_option,
-    argument,
     Context,
+    argument,
+    command,
+    group,
+    option,
+    pass_context,
+    version_option,
 )
 
 from geodepot.case import CaseSpec
@@ -29,6 +31,19 @@ def abort_if_false(ctx, param, value):
         ctx.abort()
 
 
+def setup_logging(verbose: bool) -> None:
+    """Configure root logging deterministically for the CLI."""
+    root_logger = logging.getLogger()
+    level = DEBUG if verbose else INFO
+    root_logger.setLevel(level)
+    if not root_logger.handlers:
+        handler = StreamHandler(sys.stderr)
+        handler.setFormatter(Formatter("%(levelname)s:%(name)s:%(message)s"))
+        root_logger.addHandler(handler)
+    for handler in root_logger.handlers:
+        handler.setLevel(level)
+
+
 @group()
 @version_option()
 @option(
@@ -40,18 +55,20 @@ def abort_if_false(ctx, param, value):
     help="Show Geodepot and third-party software licenses.",
 )
 @option(
+    "-v",
     "--verbose",
-    " /-v",
     is_flag=True,
     default=False,
     help="Be verbose in reporting the progress.",
 )
 @pass_context
 def geodepot_grp(ctx, verbose):
-    loglevel = DEBUG if verbose else INFO
-    basicConfig(level=loglevel)
+    setup_logging(verbose)
     ctx.ensure_object(dict)
     ctx.obj["logger"] = getLogger(__name__)
+    ctx.obj["logger"].debug(
+        "CLI invoked with command_path=%s verbose=%s", ctx.command_path, verbose
+    )
 
 
 @command(name="add", help="Add or update a case or a data item.")

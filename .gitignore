@@ -2,6 +2,10 @@
 .idea/
 .run/
 
+# Local development settings
+.env
+.env.local
+
 # Build dirs
 /src/geodepot.egg-info/
 /src/geodepot/__pycache__
@@ -10,6 +14,7 @@
 /build
 /dist
 /logs
+/result
 
 /experiments/pyinstaller/geodepot.spec
 /experiments/pyinstaller/build/

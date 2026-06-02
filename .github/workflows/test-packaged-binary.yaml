@@ -1,0 +1,230 @@
+name: Test Packaged Binaries
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'src/geodepot/**'
+      - 'pyproject.toml'
+      - 'packaging/**'
+      - '.github/workflows/test-packaged-binary.yaml'
+      - 'tests/test_cli_all_commands.py'
+      - 'tests/test_data_formats.py'
+
+jobs:
+  test-packaged-binary-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          manifest-path: pyproject.toml
+          environments: dev
+          activate-environment: dev
+          locked: true
+          cache: true
+
+      - name: Download test data
+        run: pixi run -e dev download-data
+
+      - name: Build and install environment
+        run: pixi install --environment default
+
+      - name: Create portable bundle
+        run: |
+          mkdir -p smoke/geodepot
+          # Get the pixi environment path using JSON output for robustness
+          PIXI_ENV=$(pixi info --json | python3 -c "import json, sys; data = json.load(sys.stdin); env = [e for e in data['environments_info'] if e['name'] == 'default'][0]; print(env['prefix'])")
+          # Copy the entire environment to the bundle
+          cp -r "$PIXI_ENV" smoke/geodepot/env
+          # Clean up activation scripts that may contain build-path references
+          rm -rf smoke/geodepot/env/etc/conda/activate.d
+          rm -rf smoke/geodepot/env/etc/conda/deactivate.d
+          # Remove path-leaking bin wrappers
+          python packaging/ci/remove_path_leaking_bin_wrappers.py smoke/geodepot/env "$GITHUB_WORKSPACE"
+          # Add wrapper script
+          cp packaging/pixi/geodepot.sh smoke/geodepot/geodepot
+          chmod +x smoke/geodepot/geodepot
+
+      - name: Test binary --help
+        run: ./smoke/geodepot/geodepot --help
+
+      - name: Test binary --version
+        run: ./smoke/geodepot/geodepot --version
+
+      - name: Test binary init
+        run: "mkdir -p smoke/test_repo && cd smoke/test_repo && ../geodepot/geodepot init"
+
+      - name: Test binary add geopackage
+        run: "cd smoke/test_repo && ../geodepot/geodepot add test_case ../../tests/data/sources/wippolder/wippolder.gpkg"
+
+      - name: Test binary add cityjson
+        run: "cd smoke/test_repo && ../geodepot/geodepot add cityjson_case ../../tests/data/sources/wippolder/3dbag-10-286-560.city.json"
+
+      - name: Test binary list
+        run: "cd smoke/test_repo && ../geodepot/geodepot list"
+
+      - name: Test binary show
+        run: "cd smoke/test_repo && ../geodepot/geodepot show test_case"
+
+      - name: Test binary remote add
+        run: "cd smoke/test_repo && ../geodepot/geodepot remote add test_remote http://example.com/test"
+
+      - name: Test binary fetch (should fail gracefully with non-existent remote)
+        run: "cd smoke/test_repo && ../geodepot/geodepot fetch test_remote 2>&1 || true"
+
+      - name: Test binary push (should fail gracefully with non-existent remote)
+        run: "cd smoke/test_repo && ../geodepot/geodepot push test_remote 2>&1 || true"
+
+      - name: Test binary pull (should fail gracefully with non-existent remote)
+        run: "cd smoke/test_repo && ../geodepot/geodepot pull test_remote 2>&1 || true"
+
+      - name: Cleanup smoke directory
+        if: always()
+        run: rm -rf smoke
+
+  test-packaged-binary-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install wget on Windows
+        run: choco install wget
+
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          manifest-path: pyproject.toml
+          environments: dev
+          activate-environment: dev
+          locked: true
+          cache: true
+
+      - name: Download test data
+        run: pixi run -e dev download-data
+
+      - name: Build and install environment
+        run: pixi install --environment default
+
+      - name: Create portable bundle
+        run: |
+          New-Item -ItemType Directory -Force smoke/geodepot | Out-Null
+          # Get the pixi environment path using JSON output for robustness
+          $pixiEnv = pixi info --json | python3 -c "import json, sys; data = json.load(sys.stdin); env = [e for e in data['environments_info'] if e['name'] == 'default'][0]; print(env['prefix'])"
+          # Copy the entire environment to the bundle
+          Copy-Item -Recurse -Force "$pixiEnv" smoke/geodepot/env
+          # Clean up activation scripts that may contain build-path references
+          Remove-Item -Recurse -Force smoke/geodepot/env/etc/conda/activate.d -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force smoke/geodepot/env/etc/conda/deactivate.d -ErrorAction SilentlyContinue
+          # Remove path-leaking bin wrappers
+          python packaging/ci/remove_path_leaking_bin_wrappers.py smoke/geodepot/env "$env:GITHUB_WORKSPACE"
+          # Add wrapper scripts
+          Copy-Item packaging/pixi/geodepot.cmd smoke/geodepot/geodepot.cmd
+          Copy-Item packaging/pixi/geodepot.ps1 smoke/geodepot/geodepot.ps1
+
+      - name: Test binary --help
+        run: '& .\smoke\geodepot\geodepot.cmd --help'
+
+      - name: Test binary init
+        run: 'New-Item -ItemType Directory -Force smoke/test_repo; Push-Location smoke/test_repo; & ..\geodepot\geodepot.cmd init; Pop-Location'
+
+      - name: Test binary add geopackage
+        run: 'Push-Location smoke/test_repo; & ..\geodepot\geodepot.cmd add test_case $env:GITHUB_WORKSPACE\tests\data\sources\wippolder\wippolder.gpkg; Pop-Location'
+
+      - name: Test binary add cityjson
+        run: 'Push-Location smoke/test_repo; & ..\geodepot\geodepot.cmd add cityjson_case $env:GITHUB_WORKSPACE\tests\data\sources\wippolder\3dbag-10-286-560.city.json; Pop-Location'
+
+      - name: Test binary list
+        run: 'Push-Location smoke/test_repo; & ..\geodepot\geodepot.cmd list; Pop-Location'
+
+      - name: Test binary show
+        run: 'Push-Location smoke/test_repo; & ..\geodepot\geodepot.cmd show test_case; Pop-Location'
+
+      - name: Test binary remote add
+        run: 'Push-Location smoke/test_repo; & ..\geodepot\geodepot.cmd remote add test_remote http://example.com/test; Pop-Location'
+
+      - name: Test binary fetch (should fail gracefully with non-existent remote)
+        run: 'Push-Location smoke/test_repo; & ..\geodepot\geodepot.cmd fetch test_remote 2>&1 | Out-Null; Pop-Location'
+        continue-on-error: true
+
+      - name: Test binary push (should fail gracefully with non-existent remote)
+        run: 'Push-Location smoke/test_repo; & ..\geodepot\geodepot.cmd push test_remote 2>&1 | Out-Null; Pop-Location'
+        continue-on-error: true
+
+      - name: Test binary pull (should fail gracefully with non-existent remote)
+        run: 'Push-Location smoke/test_repo; & ..\geodepot\geodepot.cmd pull test_remote 2>&1 | Out-Null; Pop-Location'
+        continue-on-error: true
+
+      - name: Cleanup smoke directory
+        if: always()
+        run: Remove-Item -Recurse -Force smoke
+
+  test-packaged-binary-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          manifest-path: pyproject.toml
+          environments: dev
+          activate-environment: dev
+          locked: true
+          cache: true
+
+      - name: Download test data
+        run: pixi run -e dev download-data
+
+      - name: Build and install environment
+        run: pixi install --environment default
+
+      - name: Create portable bundle
+        run: |
+          mkdir -p smoke/geodepot
+          # Get the pixi environment path using JSON output for robustness
+          PIXI_ENV=$(pixi info --json | python3 -c "import json, sys; data = json.load(sys.stdin); env = [e for e in data['environments_info'] if e['name'] == 'default'][0]; print(env['prefix'])")
+          # Copy the entire environment to the bundle
+          cp -r "$PIXI_ENV" smoke/geodepot/env
+          # Clean up activation scripts that may contain build-path references
+          rm -rf smoke/geodepot/env/etc/conda/activate.d
+          rm -rf smoke/geodepot/env/etc/conda/deactivate.d
+          # Remove path-leaking bin wrappers
+          python packaging/ci/remove_path_leaking_bin_wrappers.py smoke/geodepot/env "$GITHUB_WORKSPACE"
+          # Add wrapper script
+          cp packaging/pixi/geodepot.sh smoke/geodepot/geodepot
+          chmod +x smoke/geodepot/geodepot
+
+      - name: Test binary --help
+        run: ./smoke/geodepot/geodepot --help
+
+      - name: Test binary init
+        run: "mkdir -p smoke/test_repo && cd smoke/test_repo && ../geodepot/geodepot init"
+
+      - name: Test binary add geopackage
+        run: "cd smoke/test_repo && ../geodepot/geodepot add test_case ../../tests/data/sources/wippolder/wippolder.gpkg"
+
+      - name: Test binary add cityjson
+        run: "cd smoke/test_repo && ../geodepot/geodepot add cityjson_case ../../tests/data/sources/wippolder/3dbag-10-286-560.city.json"
+
+      - name: Test binary list
+        run: "cd smoke/test_repo && ../geodepot/geodepot list"
+
+      - name: Test binary show
+        run: "cd smoke/test_repo && ../geodepot/geodepot show test_case"
+
+      - name: Test binary remote add
+        run: "cd smoke/test_repo && ../geodepot/geodepot remote add test_remote http://example.com/test"
+
+      - name: Test binary fetch (should fail gracefully with non-existent remote)
+        run: "cd smoke/test_repo && ../geodepot/geodepot fetch test_remote 2>&1 || true"
+
+      - name: Test binary push (should fail gracefully with non-existent remote)
+        run: "cd smoke/test_repo && ../geodepot/geodepot push test_remote 2>&1 || true"
+
+      - name: Test binary pull (should fail gracefully with non-existent remote)
+        run: "cd smoke/test_repo && ../geodepot/geodepot pull test_remote 2>&1 || true"
+
+      - name: Cleanup smoke directory
+        if: always()
+        run: rm -rf smoke

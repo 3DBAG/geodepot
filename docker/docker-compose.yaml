@@ -7,6 +7,6 @@ services:
       - "8080:80"    # HTTP for pull
       - "2222:22"    # SSH for push
     volumes:
-      - ../tests/data/integration/server:/srv/geodepot
+      - ${GEODEPOT_HOST_WORKSPACE:-..}/tests/data/integration/server:/srv/geodepot:z
     environment:
       - SSH_PUBLIC_KEY=${SSH_PUBLIC_KEY:-}

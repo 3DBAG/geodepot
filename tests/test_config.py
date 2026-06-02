@@ -171,37 +171,69 @@ def test_configure_get(mock_user_home, mock_project_dir):
 
 
 @pytest.mark.parametrize(
-    argnames="url_with_path,url,path,is_ssh",
+    argnames="url_with_path,url,path,is_ssh,port",
     argvalues=(
         (
             "ssh://vagrant@192.168.56.5:/srv/geodepot/.geodepot",
             "vagrant@192.168.56.5",
             "/srv/geodepot/.geodepot",
             True,
+            None,
+        ),
+        (
+            "ssh://root@localhost:2222:/srv/geodepot/.geodepot",
+            "root@localhost",
+            "/srv/geodepot/.geodepot",
+            True,
+            2222,
         ),
         (
             "ssh://192.168.56.5:/srv/geodepot/.geodepot",
             "192.168.56.5",
             "/srv/geodepot/.geodepot",
             True,
+            None,
         ),
-        ("ssh://vagrant@192.168.56.5", "vagrant@192.168.56.5", "", True),
+        (
+            "ssh://root@localhost:2222",
+            "root@localhost",
+            "",
+            True,
+            2222,
+        ),
+        (
+            "ssh://vagrant@192.168.56.5",
+            "vagrant@192.168.56.5",
+            "",
+            True,
+            None,
+        ),
         (
             "https://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot",
             "https://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot",
             "",
             False,
+            None,
         ),
         (
             "http://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot",
             "http://data.3dgi.xyz/geodepot-test-data/mock_project/.geodepot",
             "",
             False,
+            None,
         ),
     ),
-    ids=("ssh-with-user", "ssh-without-user", "ssh-with-user-no-path", "https", "http"),
+    ids=(
+        "ssh-with-user",
+        "ssh-with-port-and-path",
+        "ssh-without-user",
+        "ssh-with-port-no-path",
+        "ssh-with-user-no-path",
+        "https",
+        "http",
+    ),
 )
-def test_remote_create(url_with_path, url, path, is_ssh):
+def test_remote_create(url_with_path, url, path, is_ssh, port):
     """Can we instantiate a Remote object with the supported protocols and URL/path
     configurations?"""
     remote = Remote(name="myremote", url=url_with_path)
@@ -209,6 +241,7 @@ def test_remote_create(url_with_path, url, path, is_ssh):
     if is_ssh:
         assert remote.is_ssh is True
         assert remote.ssh_host == url
+        assert remote.ssh_port == port
         assert (
             remote.path_index == f"{path}/index.geojson"
             if path != ""

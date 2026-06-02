@@ -1,9 +1,12 @@
 from dataclasses import dataclass, field
+from logging import getLogger
 from pathlib import Path
 from typing import Self, NewType
 
 from geodepot.config import User, get_current_user
 from geodepot.data import Data, DataName
+
+logger = getLogger(__name__)
 
 CaseName = NewType("CaseName", str)
 
@@ -42,7 +45,16 @@ class CaseSpec:
     @classmethod
     def from_str(cls, casespec: str) -> Self:
         """Parse the case specifier."""
-        return CaseSpec(*casespec.split("/"))
+        parts = casespec.split("/")
+        logger.debug("Parsing case specifier %s into %d part(s)", casespec, len(parts))
+        parsed = CaseSpec(*parts)
+        logger.debug(
+            "Parsed case specifier %s as case=%s data=%s",
+            casespec,
+            parsed.case_name,
+            parsed.data_name,
+        )
+        return parsed
 
 
 @dataclass(repr=True, order=True)
@@ -75,12 +87,29 @@ class Case:
             changed_by=data_changed_by,
             data_name=casespec.data_name if casespec is not None else None,
         )
+        logger.debug(
+            "Adding data from %s to case %s as %s format=%s description_set=%s license_set=%s",
+            source_path,
+            self.name,
+            data.name,
+            data_format,
+            data_description is not None,
+            data_license is not None,
+        )
         self.add_data(data)
         return data
 
     def add_data(self, data: Data):
+        replaced = data.name in self.data
         self.data[data.name] = data
         self.changed_by = data.changed_by
+        logger.debug(
+            "Attached data %s to case %s replaced=%s total_data_items=%d",
+            data.name,
+            self.name,
+            replaced,
+            len(self.data),
+        )
 
     def get_data(self, name: DataName) -> Data | None:
         # TODO: maybe this should take a CaseSpec as argument instead of just a DataName
@@ -88,10 +117,28 @@ class Case:
 
     def remove_data(self, name: DataName) -> Data | None:
         """Deletes the data item from the register of the Case."""
+        logger.debug("Removing data %s from case %s", name, self.name)
         self.changed_by = get_current_user()
-        return self.data.pop(name, None)
+        removed = self.data.pop(name, None)
+        if removed is None:
+            logger.debug("No data %s found in case %s", name, self.name)
+        else:
+            logger.debug(
+                "Removed data %s from case %s remaining_data_items=%d",
+                name,
+                self.name,
+                len(self.data),
+            )
+        return removed
 
     def to_pretty(self) -> str:
+        logger.debug(
+            "Serializing case %s for display data_items=%d sha1_set=%s changed_by_set=%s",
+            self.name,
+            len(self.data),
+            self.sha1 is not None,
+            self.changed_by is not None,
+        )
         output = [
             f"NAME={self.name}",
             f"\nDESCRIPTION={self.description}",
