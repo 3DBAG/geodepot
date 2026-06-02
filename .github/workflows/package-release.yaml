@@ -111,8 +111,13 @@ jobs:
           elif [ "${{ runner.os }}" = "macOS" ]; then
             # On macOS, fix @rpath for dylibs
             find dist/geodepot/env/lib -name '*.dylib' -type f | while read -r lib; do
-              # Change absolute paths to @loader_path (macOS equivalent of $ORIGIN)
-              # Match any absolute path that's not already in the bundle
+              # First, fix the library's own ID to use @rpath
+              current_id=$(otool -D "$lib" 2>/dev/null | tail -1 | awk '{print $1}')
+              if [ -n "$current_id" ] && [ "$current_id" != @rpath ]; then
+                # Change the library's ID to @rpath/filename
+                install_name_tool -id "@rpath/$(basename "$lib")" "$lib" 2>/dev/null || true
+              fi
+              # Then fix all dependencies
               for dep in $(otool -L "$lib" | grep -E "\t/" | awk '{print $1}'); do
                 # Skip if dependency is already relative or @rpath
                 if [[ "$dep" == @* ]] || [[ "$dep" != /* ]]; then
@@ -122,7 +127,7 @@ jobs:
                 if [[ "$dep" == /usr/lib/* ]] || [[ "$dep" == /System/Library/* ]]; then
                   continue
                 fi
-                install_name_tool -change "$dep" "@loader_path/$(basename "$dep")" "$lib" 2>/dev/null || true
+                install_name_tool -change "$dep" "@rpath/$(basename "$dep")" "$lib" 2>/dev/null || true
               done
             done
           fi
