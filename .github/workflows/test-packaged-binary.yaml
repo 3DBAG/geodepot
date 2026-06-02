@@ -1,0 +1,240 @@
+name: Test Packaged Binaries
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'src/geodepot/**'
+      - 'pyproject.toml'
+      - 'packaging/**'
+
+jobs:
+  test-packaged-binary:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: geodepot-linux
+            platform_id: linux
+            shell: bash
+            geodepot_script: geodepot
+          - os: windows-latest
+            artifact_name: geodepot-win
+            platform_id: windows
+            shell: pwsh
+            geodepot_script: geodepot.cmd
+          - os: macos-latest
+            artifact_name: geodepot-macos
+            platform_id: macos
+            shell: bash
+            geodepot_script: geodepot
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - if: runner.os == 'Windows'
+        name: Install wget on Windows
+        run: choco install wget
+
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          manifest-path: pyproject.toml
+          environments: dev
+          activate-environment: dev
+          locked: true
+          cache: true
+
+      - name: Download test data
+        run: pixi run -e dev download-data
+
+      - name: Build package
+        run: pixi build --path pyproject.toml --output-dir build/conda
+
+      - if: runner.os != 'Windows'
+        name: Get package path (non-Windows)
+        run: |
+          echo "PKG_PATH=$(ls build/conda/geodepot-*.conda | head -1)" >> $GITHUB_ENV
+
+      - if: runner.os == 'Windows'
+        name: Get package path (Windows)
+        run: |
+          $pkg = Get-ChildItem build/conda/geodepot-*.conda | Select-Object -First 1
+          echo "PKG_PATH=$($pkg.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Create bundle
+        run: |
+          mkdir -p dist
+          pixi exec --spec pixi-pack -- pixi-pack --environment default --inject "$PKG_PATH" --output-file dist/environment.tar pyproject.toml
+
+      - if: runner.os != 'Windows'
+        name: Extract bundle (non-Windows)
+        run: |
+          mkdir -p smoke/geodepot
+          cd smoke/geodepot
+          pixi exec --spec pixi-unpack -- pixi-unpack ../../dist/environment.tar
+          rm -rf activate* deactivate*
+          python ../../packaging/ci/remove_path_leaking_bin_wrappers.py . "$GITHUB_WORKSPACE"
+          cp ../../packaging/pixi/geodepot.sh .
+          chmod +x geodepot
+
+      - if: runner.os == 'Windows'
+        name: Extract bundle (Windows)
+        run: |
+          New-Item -ItemType Directory -Force smoke/geodepot | Out-Null
+          Push-Location smoke/geodepot
+          pixi exec --spec pixi-unpack -- pixi-unpack ..\dist\environment.tar
+          Remove-Item -Recurse -Force activate*, deactivate* -ErrorAction SilentlyContinue
+          python ..\..\packaging\ci\remove_path_leaking_bin_wrappers.py . "$env:GITHUB_WORKSPACE"
+          Copy-Item ..\..\packaging\pixi\geodepot.cmd .
+          Copy-Item ..\..\packaging\pixi\geodepot.ps1 .
+          Pop-Location
+
+      # ========================================================================
+      # CLI Command Tests for Packaged Binary
+      # ========================================================================
+
+      - name: Test binary --help
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && format('./smoke/geodepot/{0} --help', matrix.geodepot_script) || format('& .\smoke\geodepot\{0} --help', matrix.geodepot_script) }}
+
+      - name: Test binary --version
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && format('./smoke/geodepot/{0} --version', matrix.geodepot_script) || format('& .\smoke\geodepot\{0} --version', matrix.geodepot_script) }}
+
+      # Test init command
+      - name: Test binary init
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && 'mkdir -p smoke/test_repo && cd smoke/test_repo && ../../geodepot/geodepot init' || 'New-Item -ItemType Directory -Force smoke/test_repo; Push-Location smoke/test_repo; & ..\..\geodepot\geodepot.cmd init; Pop-Location' }}
+
+      # Test add command with various data formats
+      - name: Test binary add geopackage
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && 'cd smoke/test_repo && ../../geodepot/geodepot add test_case ../../../tests/data/sources/wippolder/wippolder.gpkg' || 'Push-Location smoke/test_repo; & ..\..\geodepot\geodepot.cmd add test_case $env:GITHUB_WORKSPACE/tests/data/sources/wippolder/wippolder.gpkg; Pop-Location' }}
+
+      - name: Test binary add las file
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && 'cd smoke/test_repo && ../../geodepot/geodepot add las_test ../../../tests/data/sources/wippolder/wippolder.las' || 'Push-Location smoke/test_repo; & ..\..\geodepot\geodepot.cmd add las_test $env:GITHUB_WORKSPACE/tests/data/sources/wippolder/wippolder.las; Pop-Location' }}
+
+      - name: Test binary add geotiff
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && 'cd smoke/test_repo && ../../geodepot/geodepot add tif_test ../../../tests/data/sources/wippolder/wippolder.tif' || 'Push-Location smoke/test_repo; & ..\..\geodepot\geodepot.cmd add tif_test $env:GITHUB_WORKSPACE/tests/data/sources/wippolder/wippolder.tif; Pop-Location' }}
+
+      - name: Test binary add cityjson
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && 'cd smoke/test_repo && ../../geodepot/geodepot add cityjson_test ../../../tests/data/sources/wippolder/3dbag-10-286-560.city.json' || 'Push-Location smoke/test_repo; & ..\..\geodepot\geodepot.cmd add cityjson_test $env:GITHUB_WORKSPACE/tests/data/sources/wippolder/3dbag-10-286-560.city.json; Pop-Location' }}
+
+      # Test list command
+      - name: Test binary list
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && 'cd smoke/test_repo && ../../geodepot/geodepot list' || 'Push-Location smoke/test_repo; & ..\..\geodepot\geodepot.cmd list; Pop-Location' }}
+
+      # Test show command
+      - name: Test binary show case
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && 'cd smoke/test_repo && ../../geodepot/geodepot show test_case' || 'Push-Location smoke/test_repo; & ..\..\geodepot\geodepot.cmd show test_case; Pop-Location' }}
+
+      - name: Test binary show data item
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && 'cd smoke/test_repo && ../../geodepot/geodepot show test_case/wippolder.gpkg' || 'Push-Location smoke/test_repo; & ..\..\geodepot\geodepot.cmd show test_case/wippolder.gpkg; Pop-Location' }}
+
+      # Test get command
+      - name: Test binary get
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && 'cd smoke/test_repo && ../../geodepot/geodepot get test_case/wippolder.gpkg' || 'Push-Location smoke/test_repo; & ..\..\geodepot\geodepot.cmd get test_case/wippolder.gpkg; Pop-Location' }}
+
+      # Test add with metadata
+      - name: Test binary add with description
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && 'cd smoke/test_repo && ../../geodepot/geodepot add with_meta ../../../tests/data/sources/wippolder/wippolder_changed.gpkg --description "Test description"' || 'Push-Location smoke/test_repo; & ..\..\geodepot\geodepot.cmd add with_meta $env:GITHUB_WORKSPACE/tests/data/sources/wippolder/wippolder_changed.gpkg --description "Test description"; Pop-Location' }}
+
+      - name: Test binary add with license
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && 'cd smoke/test_repo && ../../geodepot/geodepot add with_license ../../../tests/data/sources/3dbag_one.city.json --license "CC-BY-4.0"' || 'Push-Location smoke/test_repo; & ..\..\geodepot\geodepot.cmd add with_license $env:GITHUB_WORKSPACE/tests/data/sources/3dbag_one.city.json --license "CC-BY-4.0"; Pop-Location' }}
+
+      # Test add with format override
+      - name: Test binary add with format override
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && 'cd smoke/test_repo && ../../geodepot/geodepot add format_override ../../../tests/data/sources/wippolder/wippolder.las --format CUSTOM_FORMAT' || 'Push-Location smoke/test_repo; & ..\..\geodepot\geodepot.cmd add format_override $env:GITHUB_WORKSPACE/tests/data/sources/wippolder/wippolder.las --format CUSTOM_FORMAT; Pop-Location' }}
+
+      # Test config commands
+      - name: Test binary config set
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && 'cd smoke/test_repo && ../../geodepot/geodepot config set user.name "Test User"' || 'Push-Location smoke/test_repo; & ..\..\geodepot\geodepot.cmd config set user.name "Test User"; Pop-Location' }}
+
+      - name: Test binary config get
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && 'cd smoke/test_repo && ../../geodepot/geodepot config get user.name' || 'Push-Location smoke/test_repo; & ..\..\geodepot\geodepot.cmd config get user.name; Pop-Location' }}
+
+      - name: Test binary config list
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && 'cd smoke/test_repo && ../../geodepot/geodepot config list' || 'Push-Location smoke/test_repo; & ..\..\geodepot\geodepot.cmd config list; Pop-Location' }}
+
+      # Test remote commands
+      - name: Test binary remote add
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && 'cd smoke/test_repo && ../../geodepot/geodepot remote add origin https://example.com/geodepot' || 'Push-Location smoke/test_repo; & ..\..\geodepot\geodepot.cmd remote add origin https://example.com/geodepot; Pop-Location' }}
+
+      - name: Test binary remote list
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && 'cd smoke/test_repo && ../../geodepot/geodepot remote list' || 'Push-Location smoke/test_repo; & ..\..\geodepot\geodepot.cmd remote list; Pop-Location' }}
+
+      - name: Test binary remote remove
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && 'cd smoke/test_repo && ../../geodepot/geodepot remote remove origin' || 'Push-Location smoke/test_repo; & ..\..\geodepot\geodepot.cmd remote remove origin; Pop-Location' }}
+
+      # Test remove command
+      - name: Test binary remove data item
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && 'cd smoke/test_repo && ../../geodepot/geodepot remove test_case/wippolder.gpkg' || 'Push-Location smoke/test_repo; & ..\..\geodepot\geodepot.cmd remove test_case/wippolder.gpkg; Pop-Location' }}
+
+      - name: Test binary remove case
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && 'cd smoke/test_repo && ../../geodepot/geodepot remove las_test' || 'Push-Location smoke/test_repo; & ..\..\geodepot\geodepot.cmd remove las_test; Pop-Location' }}
+
+      # Test add multiple files at once
+      - name: Test binary add multiple files
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && 'cd smoke/test_repo && ../../geodepot/geodepot add multi_test ../../../tests/data/sources/wippolder/wippolder.gpkg ../../../tests/data/sources/wippolder/wippolder.las' || 'Push-Location smoke/test_repo; & ..\..\geodepot\geodepot.cmd add multi_test $env:GITHUB_WORKSPACE/tests/data/sources/wippolder/wippolder.gpkg $env:GITHUB_WORKSPACE/tests/data/sources/wippolder/wippolder.las; Pop-Location' }}
+
+      # Verify final state
+      - name: Test binary list final
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && 'cd smoke/test_repo && ../../geodepot/geodepot list' || 'Push-Location smoke/test_repo; & ..\..\geodepot\geodepot.cmd list; Pop-Location' }}
+
+      # Test with directory as data
+      - name: Test binary add directory as data
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.shell == 'bash' && 'cd smoke/test_repo && ../../geodepot/geodepot add dir_case/tyler ../../../tests/data/sources/tyler_debug --as-data' || 'Push-Location smoke/test_repo; & ..\..\geodepot\geodepot.cmd add dir_case/tyler $env:GITHUB_WORKSPACE/tests/data/sources/tyler_debug --as-data; Pop-Location' }}
+
+      # Cleanup
+      - name: Cleanup smoke directory
+        if: always()
+        run: rm -rf smoke
