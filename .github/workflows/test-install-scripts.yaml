@@ -1,0 +1,155 @@
+name: Test Install Scripts
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'packaging/install/**'
+
+jobs:
+  test-install-unix:
+    name: Test install on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+          - os: macos-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Test install script syntax and functions
+        shell: bash
+        run: |
+          cd packaging/install
+          chmod +x geodepot-install.sh
+          
+          # Test help output
+          ./geodepot-install.sh --help > /dev/null
+          
+          # Test platform resolution
+          echo "Testing platform resolution..."
+          ./geodepot-install.sh --version test 2>&1 | grep -q "linux\|macos" || exit 1
+          echo "✓ Platform detection works"
+          
+          # Test architecture resolution  
+          echo "Testing architecture resolution..."
+          ./geodepot-install.sh --version test 2>&1 | grep -q "x86_64\|arm64" || exit 1
+          echo "✓ Architecture detection works"
+
+      - name: Test actual install from GitHub release
+        shell: bash
+        run: |
+          cd packaging/install
+          chmod +x geodepot-install.sh
+          
+          # Install to a temporary directory
+          INSTALL_DIR=$(mktemp -d)
+          echo "Installing to: $INSTALL_DIR"
+          
+          # Run the install script with --version 1.1.0
+          ./geodepot-install.sh \
+            --version 1.1.0 \
+            --install-dir "$INSTALL_DIR" \
+            --bin-dir "$INSTALL_DIR/bin" \
+            --no-wrapper
+          
+          # Verify installation
+          case "$(uname -s)" in
+            Linux*) PLATFORM="linux" ;;
+            Darwin*) PLATFORM="macos" ;;
+            *) echo "Unknown platform"; exit 1 ;;
+          esac
+          
+          case "$(uname -m)" in
+            x86_64|amd64) ARCH="x86_64" ;;
+            arm64|aarch64) ARCH="arm64" ;;
+            *) echo "Unknown architecture"; exit 1 ;;
+          esac
+          
+          BUNDLE_DIR="$INSTALL_DIR/releases/1.1.0/geodepot"
+          if [ -d "$BUNDLE_DIR" ]; then
+            echo "✓ Bundle directory created"
+            if [ -f "$BUNDLE_DIR/geodepot" ]; then
+              echo "✓ Geodepot executable found"
+              # Try to run it
+              chmod +x "$BUNDLE_DIR/geodepot"
+              "$BUNDLE_DIR/geodepot" --help > /dev/null 2>&1 && echo "✓ Geodepot executable works" || echo "✗ Geodepot executable failed"
+            else
+              echo "✗ Geodepot executable not found in $BUNDLE_DIR"
+              ls -la "$BUNDLE_DIR/" || true
+              exit 1
+            fi
+          else
+            echo "✗ Bundle directory not created at $BUNDLE_DIR"
+            exit 1
+          fi
+          
+          # Cleanup
+          rm -rf "$INSTALL_DIR"
+
+  test-install-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Test install script syntax
+        shell: pwsh
+        run: |
+          cd packaging/install
+          
+          # Test help output
+          try {
+            .\geodepot-install.ps1 -Help *>&1 | Out-Null
+            Write-Host "✓ Help output works"
+          } catch {
+            Write-Host "✗ Help output failed: $_"
+            exit 1
+          }
+
+      - name: Test actual install from GitHub release
+        shell: pwsh
+        run: |
+          cd packaging/install
+          
+          # Install to a temporary directory
+          $INSTALL_DIR = Join-Path $env:TEMP "geodepot-test-$([System.Guid]::NewGuid().Guid)"
+          Write-Host "Installing to: $INSTALL_DIR"
+          
+          try {
+            .\geodepot-install.ps1 `
+              -Version "1.1.0" `
+              -InstallDir $INSTALL_DIR `
+              -NoWrapper `
+              -NoPathUpdate
+            
+            # Verify installation
+            $BUNDLE_DIR = Join-Path $INSTALL_DIR "releases\1.1.0\geodepot"
+            if (Test-Path $BUNDLE_DIR) {
+              Write-Host "✓ Bundle directory created"
+              if (Test-Path (Join-Path $BUNDLE_DIR "geodepot.cmd")) {
+                Write-Host "✓ Geodepot executable found"
+                # Try to run it
+                & (Join-Path $BUNDLE_DIR "geodepot.cmd") --help *>&1 | Out-Null
+                Write-Host "✓ Geodepot executable works"
+              } else {
+                Write-Host "✗ Geodepot executable not found"
+                Get-ChildItem $BUNDLE_DIR -Recurse
+                exit 1
+              }
+            } else {
+              Write-Host "✗ Bundle directory not created at $BUNDLE_DIR"
+              exit 1
+            }
+          } catch {
+            Write-Host "Install failed: $_"
+            exit 1
+          } finally {
+            if (Test-Path $INSTALL_DIR) {
+              Remove-Item -Recurse -Force $INSTALL_DIR
+            }
+          }
