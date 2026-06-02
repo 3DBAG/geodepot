@@ -16,7 +16,9 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
+            expected_platform: linux
           - os: macos-latest
+            expected_platform: macos
 
     steps:
       - uses: actions/checkout@v6
@@ -29,12 +31,13 @@ jobs:
           
           # Test help output
           ./geodepot-install.sh --help > /dev/null
+          echo "✓ Help output works"
           
           # Test platform resolution by sourcing the script and calling functions directly
           echo "Testing platform resolution..."
           platform=$(sh -c '. ./geodepot-install.sh; resolve_platform')
-          if [ -z "$platform" ] || [ "$platform" != "linux" ] && [ "$platform" != "macos" ]; then
-            echo "✗ Platform detection failed: got '$platform'"
+          if [ "$platform" != "${{ matrix.expected_platform }}" ]; then
+            echo "✗ Platform detection failed: expected '${{ matrix.expected_platform }}', got '$platform'"
             exit 1
           fi
           echo "✓ Platform detection works: $platform"
@@ -66,26 +69,27 @@ jobs:
             --no-wrapper
           
           # Verify installation
-          case "$(uname -s)" in
-            Linux*) PLATFORM="linux" ;;
-            Darwin*) PLATFORM="macos" ;;
-            *) echo "Unknown platform"; exit 1 ;;
-          esac
-          
-          case "$(uname -m)" in
-            x86_64|amd64) ARCH="x86_64" ;;
-            arm64|aarch64) ARCH="arm64" ;;
-            *) echo "Unknown architecture"; exit 1 ;;
+          case "${{ matrix.os }}" in
+            ubuntu-latest)
+              PLATFORM="linux"
+              ARCH="x86_64"
+              EXECUTABLE="geodepot"
+              ;;
+            macos-latest)
+              PLATFORM="macos"
+              ARCH="arm64"
+              EXECUTABLE="geodepot"
+              ;;
           esac
           
           BUNDLE_DIR="$INSTALL_DIR/releases/1.1.0/geodepot"
           if [ -d "$BUNDLE_DIR" ]; then
             echo "✓ Bundle directory created"
-            if [ -f "$BUNDLE_DIR/geodepot" ]; then
+            if [ -f "$BUNDLE_DIR/$EXECUTABLE" ]; then
               echo "✓ Geodepot executable found"
               # Try to run it
-              chmod +x "$BUNDLE_DIR/geodepot"
-              "$BUNDLE_DIR/geodepot" --help > /dev/null 2>&1 && echo "✓ Geodepot executable works" || echo "✗ Geodepot executable failed"
+              chmod +x "$BUNDLE_DIR/$EXECUTABLE"
+              "$BUNDLE_DIR/$EXECUTABLE" --help > /dev/null 2>&1 && echo "✓ Geodepot executable works" || echo "✗ Geodepot executable failed"
             else
               echo "✗ Geodepot executable not found in $BUNDLE_DIR"
               ls -la "$BUNDLE_DIR/" || true
@@ -110,19 +114,13 @@ jobs:
         run: |
           cd packaging/install
           
-          # Test help output (PowerShell uses Get-Help, not -Help parameter)
+          # Test help output - just run the script to see if it parses correctly
           try {
-            Get-Help -Name .\geodepot-install.ps1 -ErrorAction SilentlyContinue | Out-Null
-            Write-Host "✓ Help output works"
+            .\geodepot-install.ps1 -Version "test" -NoWrapper -NoPathUpdate -ErrorAction SilentlyContinue 2>&1 | Out-Null
+            Write-Host "✓ Script syntax is valid"
           } catch {
-            # If Get-Help doesn't work, just try running the script
-            try {
-              .\geodepot-install.ps1 2>&1 | Out-Null
-              Write-Host "✓ Help output works"
-            } catch {
-              Write-Host "✗ Help output failed: $_"
-              exit 1
-            }
+            Write-Host "✗ Script syntax error: $_"
+            exit 1
           }
 
       - name: Test actual install from GitHub release
