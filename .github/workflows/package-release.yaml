@@ -84,6 +84,12 @@ jobs:
       - name: Build geodepot package (for audit/verification)
         run: pixi build --path pyproject.toml --output-dir build/conda
 
+      - if: runner.os == 'Linux'
+        name: Install patchelf for fixing library rpaths
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq patchelf
+
       - if: runner.os != 'Windows'
         name: Create release bundle non-Windows
         run: |
@@ -97,6 +103,12 @@ jobs:
           rm -rf dist/geodepot/env/etc/conda/deactivate.d
           # Remove path-leaking bin wrappers
           python packaging/ci/remove_path_leaking_bin_wrappers.py dist/geodepot/env "$GITHUB_WORKSPACE"
+          # Fix library rpaths to point to bundle's own libraries (Linux only)
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            find dist/geodepot/env/lib -name '*.so*' -type f | while read -r lib; do
+              patchelf --set-rpath '$ORIGIN' "$lib" 2>/dev/null || true
+            done
+          fi
           # Add wrapper script
           cp packaging/pixi/geodepot.sh dist/geodepot/geodepot
           chmod +x dist/geodepot/geodepot
