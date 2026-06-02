@@ -39,6 +39,80 @@ TEXT_BASENAMES = {
 }
 
 
+    # Normalize the prefix for cross-platform matching
+    # ========================================================================
+    # On Windows, we need to check both forward slashes and backslashes
+    # because the build prefix might be in either format, and the files might
+    # use either format.
+    if platform.system() == "Windows":
+        # Convert forward slashes to backslashes
+        windows_prefix = prefix.replace(b"/", b"\\")
+        # Also keep the original in case it's already in backslash format
+        prefixes_to_check = [prefix, windows_prefix]
+        # Also add both directions in case the file has mixed separators
+        if prefix != windows_prefix:
+            prefixes_to_check.append(prefix.replace(b"\\", b"/"))
+            prefixes_to_check.append(windows_prefix.replace(b"/", b"\\"))
+    else:
+        prefixes_to_check = [prefix]
+
+    removed_count = 0
+
+    # ========================================================================
+    # Scan all files in the bundle
+    # ========================================================================
+    for path in bundle_root.rglob("*"):
+        if not path.is_file() or path.is_symlink():
+            continue
+
+        # Only check text files (skip binaries, shared libraries, etc.)
+        name = path.name.lower()
+        is_text = name in TEXT_BASENAMES or path.suffix.lower() in TEXT_SUFFIXES
+
+        if not is_text:
+            continue
+
+        try:
+            content = path.read_bytes()
+
+            # Check if any of the prefixes are in the file
+            for check_prefix in prefixes_to_check:
+                if check_prefix in content:
+                    path.unlink()
+                    print(f"Removed path-leaking wrapper: {path}")
+                    removed_count += 1
+                    break
+
+        except OSError as e:
+            # File might be locked or unreadable - just skip it
+            print(f"Warning: Could not read {path}: {e}", file=sys.stderr)
+            continue
+
+    print(f"Total path-leaking wrappers removed: {removed_count}")
+    return 0
+=======
+def is_text_file(path: Path) -> bool:
+    """
+    Check if a file is likely a text file (not a binary).
+    
+    For files in bin/ directories, we check if they contain null bytes.
+    For other files, we check against known text suffixes and basenames.
+    """
+    name = path.name.lower()
+    # Fast path: known text files by name or extension
+    if name in TEXT_BASENAMES or path.suffix.lower() in TEXT_SUFFIXES:
+        return True
+    # For files in bin/ directories, check if they're text (no null bytes)
+    if path.parent.name == "bin":
+        try:
+            with path.open("rb") as handle:
+                sample = handle.read(4096)
+                return b"\0" not in sample
+        except OSError:
+            return False
+    return False
+
+
 def main(argv: list[str] | None = None) -> int:
     """
     Remove wrapper scripts that contain build-path references.
@@ -74,6 +148,54 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     # ========================================================================
+    # Normalize the prefix for cross-platform matching
+    # ========================================================================
+    # On Windows, we need to check both forward slashes and backslashes
+    # because the build prefix might be in either format, and the files might
+    # use either format.
+    if platform.system() == "Windows":
+        # Convert forward slashes to backslashes
+        windows_prefix = prefix.replace(b"/", b"\\")
+        # Also keep the original in case it's already in backslash format
+        prefixes_to_check = [prefix, windows_prefix]
+        # Also add both directions in case the file has mixed separators
+        if prefix != windows_prefix:
+            prefixes_to_check.append(prefix.replace(b"\\", b"/"))
+            prefixes_to_check.append(windows_prefix.replace(b"/", b"\\"))
+    else:
+        prefixes_to_check = [prefix]
+
+    removed_count = 0
+
+    # ========================================================================
+    # Scan all files in the bundle
+    # ========================================================================
+    for path in bundle_root.rglob("*"):
+        if not path.is_file() or path.is_symlink():
+            continue
+
+        # Check if it's a text file (including shell scripts in bin/)
+        if not is_text_file(path):
+            continue
+
+        try:
+            content = path.read_bytes()
+
+            # Check if any of the prefixes are in the file
+            for check_prefix in prefixes_to_check:
+                if check_prefix in content:
+                    path.unlink()
+                    print(f"Removed path-leaking wrapper: {path}")
+                    removed_count += 1
+                    break
+
+        except OSError as e:
+            # File might be locked or unreadable - just skip it
+            print(f"Warning: Could not read {path}: {e}", file=sys.stderr)
+            continue
+
+    print(f"Total path-leaking wrappers removed: {removed_count}")
+    return 0========================================================================
     # Normalize the prefix for cross-platform matching
     # ========================================================================
     # On Windows, we need to check both forward slashes and backslashes

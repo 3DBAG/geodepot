@@ -212,8 +212,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${GITHUB_REF_NAME}"
+          cd dist
+          FILES=(geodepot-*.zip geodepot-*.zip.sha256sum)
           if gh release view "$TAG" --repo 3DBAG/geodepot > /dev/null 2>&1; then
-            gh release upload "$TAG" dist/* --repo 3DBAG/geodepot --clobber
+            gh release upload "$TAG" "${FILES[@]}" --repo 3DBAG/geodepot --clobber
           else
-            gh release create "$TAG" dist/* --repo 3DBAG/geodepot --prerelease --title "$TAG" --generate-notes
+            gh release create "$TAG" "${FILES[@]}" --repo 3DBAG/geodepot --prerelease --title "$TAG" --generate-notes
           fi
