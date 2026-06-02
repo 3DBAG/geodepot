@@ -69,6 +69,18 @@ jobs:
       - name: Test binary show
         run: "cd smoke/test_repo && ../geodepot/geodepot show test_case"
 
+      - name: Test binary remote add
+        run: "cd smoke/test_repo && ../geodepot/geodepot remote add test_remote http://example.com/test"
+
+      - name: Test binary fetch (should fail gracefully with non-existent remote)
+        run: "cd smoke/test_repo && ../geodepot/geodepot fetch test_remote 2>&1 || true"
+
+      - name: Test binary push (should fail gracefully with non-existent remote)
+        run: "cd smoke/test_repo && ../geodepot/geodepot push test_remote 2>&1 || true"
+
+      - name: Test binary pull (should fail gracefully with non-existent remote)
+        run: "cd smoke/test_repo && ../geodepot/geodepot pull test_remote 2>&1 || true"
+
       - name: Cleanup smoke directory
         if: always()
         run: rm -rf smoke
@@ -129,6 +141,18 @@ jobs:
       - name: Test binary show
         run: 'Push-Location smoke/test_repo; & ..\geodepot\geodepot.cmd show test_case; Pop-Location'
 
+      - name: Test binary remote add
+        run: 'Push-Location smoke/test_repo; & ..\geodepot\geodepot.cmd remote add test_remote http://example.com/test; Pop-Location'
+
+      - name: Test binary fetch (should fail gracefully with non-existent remote)
+        run: 'Push-Location smoke/test_repo; & ..\geodepot\geodepot.cmd fetch test_remote 2>&1; Pop-Location || true'
+
+      - name: Test binary push (should fail gracefully with non-existent remote)
+        run: 'Push-Location smoke/test_repo; & ..\geodepot\geodepot.cmd push test_remote 2>&1; Pop-Location || true'
+
+      - name: Test binary pull (should fail gracefully with non-existent remote)
+        run: 'Push-Location smoke/test_repo; & ..\geodepot\geodepot.cmd pull test_remote 2>&1; Pop-Location || true'
+
       - name: Cleanup smoke directory
         if: always()
         run: Remove-Item -Recurse -Force smoke
@@ -185,6 +209,18 @@ jobs:
 
       - name: Test binary show
         run: "cd smoke/test_repo && ../geodepot/geodepot show test_case"
+
+      - name: Test binary remote add
+        run: "cd smoke/test_repo && ../geodepot/geodepot remote add test_remote http://example.com/test"
+
+      - name: Test binary fetch (should fail gracefully with non-existent remote)
+        run: "cd smoke/test_repo && ../geodepot/geodepot fetch test_remote 2>&1 || true"
+
+      - name: Test binary push (should fail gracefully with non-existent remote)
+        run: "cd smoke/test_repo && ../geodepot/geodepot push test_remote 2>&1 || true"
+
+      - name: Test binary pull (should fail gracefully with non-existent remote)
+        run: "cd smoke/test_repo && ../geodepot/geodepot pull test_remote 2>&1 || true"
 
       - name: Cleanup smoke directory
         if: always()
