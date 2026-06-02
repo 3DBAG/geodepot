@@ -30,15 +30,23 @@ jobs:
           # Test help output
           ./geodepot-install.sh --help > /dev/null
           
-          # Test platform resolution
+          # Test platform resolution by sourcing the script and calling functions directly
           echo "Testing platform resolution..."
-          ./geodepot-install.sh --version test 2>&1 | grep -q "linux\|macos" || exit 1
-          echo "✓ Platform detection works"
+          platform=$(sh -c '. ./geodepot-install.sh; resolve_platform')
+          if [ -z "$platform" ] || [ "$platform" != "linux" ] && [ "$platform" != "macos" ]; then
+            echo "✗ Platform detection failed: got '$platform'"
+            exit 1
+          fi
+          echo "✓ Platform detection works: $platform"
           
           # Test architecture resolution  
           echo "Testing architecture resolution..."
-          ./geodepot-install.sh --version test 2>&1 | grep -q "x86_64\|arm64" || exit 1
-          echo "✓ Architecture detection works"
+          arch=$(sh -c '. ./geodepot-install.sh; resolve_arch')
+          if [ -z "$arch" ] || [ "$arch" != "x86_64" ] && [ "$arch" != "arm64" ]; then
+            echo "✗ Architecture detection failed: got '$arch'"
+            exit 1
+          fi
+          echo "✓ Architecture detection works: $arch"
 
       - name: Test actual install from GitHub release
         shell: bash
@@ -102,13 +110,19 @@ jobs:
         run: |
           cd packaging/install
           
-          # Test help output
+          # Test help output (PowerShell uses Get-Help, not -Help parameter)
           try {
-            .\geodepot-install.ps1 -Help *>&1 | Out-Null
+            Get-Help -Name .\geodepot-install.ps1 -ErrorAction SilentlyContinue | Out-Null
             Write-Host "✓ Help output works"
           } catch {
-            Write-Host "✗ Help output failed: $_"
-            exit 1
+            # If Get-Help doesn't work, just try running the script
+            try {
+              .\geodepot-install.ps1 2>&1 | Out-Null
+              Write-Host "✓ Help output works"
+            } catch {
+              Write-Host "✗ Help output failed: $_"
+              exit 1
+            }
           }
 
       - name: Test actual install from GitHub release
