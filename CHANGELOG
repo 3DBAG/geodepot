@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-06-02
+
 - Enforced the canonical per-data archive layout (`.geodepot/cases/<case>/<data>.tar`) across sync, `get`, and integration tests, and removed the old whole-case archive fallback.
 - Added progress feedback for push, pull, and file transfer operations.
 - Fixed global config auto-creation and SSH/SFTP repository initialization from remote.
