@@ -145,13 +145,16 @@ jobs:
         run: 'Push-Location smoke/test_repo; & ..\geodepot\geodepot.cmd remote add test_remote http://example.com/test; Pop-Location'
 
       - name: Test binary fetch (should fail gracefully with non-existent remote)
-        run: 'Push-Location smoke/test_repo; & ..\geodepot\geodepot.cmd fetch test_remote 2>&1; Pop-Location || true'
+        run: 'Push-Location smoke/test_repo; & ..\geodepot\geodepot.cmd fetch test_remote 2>&1 | Out-Null; Pop-Location'
+        continue-on-error: true
 
       - name: Test binary push (should fail gracefully with non-existent remote)
-        run: 'Push-Location smoke/test_repo; & ..\geodepot\geodepot.cmd push test_remote 2>&1; Pop-Location || true'
+        run: 'Push-Location smoke/test_repo; & ..\geodepot\geodepot.cmd push test_remote 2>&1 | Out-Null; Pop-Location'
+        continue-on-error: true
 
       - name: Test binary pull (should fail gracefully with non-existent remote)
-        run: 'Push-Location smoke/test_repo; & ..\geodepot\geodepot.cmd pull test_remote 2>&1; Pop-Location || true'
+        run: 'Push-Location smoke/test_repo; & ..\geodepot\geodepot.cmd pull test_remote 2>&1 | Out-Null; Pop-Location'
+        continue-on-error: true
 
       - name: Cleanup smoke directory
         if: always()
