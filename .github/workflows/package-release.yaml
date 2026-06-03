@@ -228,7 +228,9 @@ jobs:
         run: |
           cd dist
           7z a "geodepot-${{ matrix.platform_id }}-${env:GEODEPOT_ARCH}.zip" geodepot
-          certUtil -hashfile "geodepot-${{ matrix.platform_id }}-${env:GEODEPOT_ARCH}.zip" SHA256 > "geodepot-${{ matrix.platform_id }}-${env:GEODEPOT_ARCH}.zip.sha256sum"
+          # Use PowerShell to get hash in consistent format (hash followed by filename)
+          $hash = (Get-FileHash -Path "geodepot-${{ matrix.platform_id }}-${env:GEODEPOT_ARCH}.zip" -Algorithm SHA256).Hash.ToLower()
+          "$hash  geodepot-${{ matrix.platform_id }}-${env:GEODEPOT_ARCH}.zip" | Out-File -Encoding ASCII "geodepot-${{ matrix.platform_id }}-${env:GEODEPOT_ARCH}.zip.sha256sum"
 
       - name: List contents
         run: ls dist
